@@ -3357,6 +3357,7 @@ const ARTURITO_GADGET_KB_SEED = [
       this._liveDb = null;
       this._liveOnUpdate = null;
       this._cloudKBActive = false;
+      this._cloudKnowledgeActive = false;
       this._cloudSettingsActive = false;
       this._pushing = false;
       this._syncing = false;
@@ -3724,7 +3725,11 @@ const ARTURITO_GADGET_KB_SEED = [
         if (JSON.stringify(mergedManual) !== JSON.stringify(database.manualKnowledge || [])) changes.knowledge = true;
         database.gadgetKB = mergedGadget;
         database.manualKnowledge = mergedManual;
-        if (settingsSnap?.exists() || remoteGadget.length || remoteManual.length) {
+        if (settingsSnap?.exists()) {
+          this._cloudSettingsActive = true;
+        }
+        if (remoteGadget.length || remoteManual.length) {
+          this._cloudKnowledgeActive = true;
           this._cloudKBActive = true;
         }
         if (changes.gadgetKB || changes.knowledge || settingsSnap?.exists()) {
@@ -3870,6 +3875,7 @@ const ARTURITO_GADGET_KB_SEED = [
         );
         this._markPushed(list.map((e) => e.id || e.key));
         this._cloudKBActive = true;
+        this._cloudKnowledgeActive = list.length > 0 || this._cloudKnowledgeActive;
         return;
       }
       const toWrite = options.changedIds?.length
@@ -3883,6 +3889,7 @@ const ARTURITO_GADGET_KB_SEED = [
           (e) => e.id || e.key
         );
         this._markPushed(toWrite.map((e) => e.id || e.key));
+        this._cloudKnowledgeActive = true;
       }
       this._cloudKBActive = true;
     }
@@ -3903,6 +3910,7 @@ const ARTURITO_GADGET_KB_SEED = [
         );
         this._markPushed(manual.map((k) => k.id));
         this._cloudKBActive = true;
+        this._cloudKnowledgeActive = manual.length > 0 || this._cloudKnowledgeActive;
         return;
       }
       const toWrite = options.changedIds?.length
@@ -3916,6 +3924,7 @@ const ARTURITO_GADGET_KB_SEED = [
           (k) => k.id
         );
         this._markPushed(toWrite.map((k) => k.id));
+        this._cloudKnowledgeActive = true;
       }
       this._cloudKBActive = true;
     }
@@ -4098,6 +4107,7 @@ const ARTURITO_GADGET_KB_SEED = [
 
       localStorage.removeItem(CLOUD_SYNC_KEY);
       this._cloudKBActive = true;
+      this._cloudKnowledgeActive = !!((database.gadgetKB || []).length || (database.manualKnowledge || []).length);
       return { ok: true };
     }
 
@@ -4165,8 +4175,11 @@ const ARTURITO_GADGET_KB_SEED = [
           if (this._pushing) return;
           const remote = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
             .sort((a, b) => (a.order || 0) - (b.order || 0));
-          if (!remote.length && !this._cloudKBActive && (database.gadgetKB?.length || 0) > 0) return;
-          this._cloudKBActive = true;
+          if (!remote.length && !this._cloudKnowledgeActive && (database.gadgetKB?.length || 0) > 0) return;
+          if (remote.length) {
+            this._cloudKnowledgeActive = true;
+            this._cloudKBActive = true;
+          }
           const merged = this.mergeGadgetKB(database.gadgetKB || [], remote);
           if (JSON.stringify(merged) === JSON.stringify(database.gadgetKB || [])) return;
           this._syncing = true;
@@ -4184,8 +4197,11 @@ const ARTURITO_GADGET_KB_SEED = [
         (snap) => {
           if (this._pushing) return;
           const remote = snap.docs.map((d) => this.mapManualFromCloud(d.id, d.data()));
-          if (!remote.length && !this._cloudKBActive && (database.manualKnowledge?.length || 0) > 0) return;
-          this._cloudKBActive = true;
+          if (!remote.length && !this._cloudKnowledgeActive && (database.manualKnowledge?.length || 0) > 0) return;
+          if (remote.length) {
+            this._cloudKnowledgeActive = true;
+            this._cloudKBActive = true;
+          }
           const merged = this.mergeManualKnowledge(database.manualKnowledge || [], remote);
           if (JSON.stringify(merged) === JSON.stringify(database.manualKnowledge || [])) return;
           this._syncing = true;
@@ -4379,7 +4395,7 @@ const ARTURITO_GADGET_KB_SEED = [
       return { cloud: cloudOk };
     }
 
-    /** Al conectar: la nube manda siempre; sube semilla solo si Firestore está vacío */
+    /** Al conectar: la nube manda siempre; sube semilla solo si un staff autenticado encuentra Firestore sin KB */
     async bootstrap(database, callbacks = {}) {
       if (!this.fb.isEnabled()) return { mode: 'offline' };
 
@@ -4391,19 +4407,26 @@ const ARTURITO_GADGET_KB_SEED = [
       await this.sync.pullPublicCloudData(database, true);
       await this.sync.ensureTicketEmailSettings(database);
 
-      const cloudEmpty = !this.sync._cloudSettingsActive && !this.sync._cloudKBActive;
+      const cloudHasKnowledge = this.sync._cloudKnowledgeActive === true;
+      const canSeedCloud = this.sync.auth?.isStaff?.(this.sync.auth.currentUser) === true;
 
-      if (cloudEmpty) {
+      if (!cloudHasKnowledge && canSeedCloud) {
         try {
           if (global.DatabaseModule?.seedGadgetTemplate) global.DatabaseModule.seedGadgetTemplate();
           await this.sync.ensureCondominioDoc(database.settings?.buildingName);
           const mig = await this.sync.migrateLocalToCloud(database);
           if (mig?.ok) migrated = true;
           this.sync._cloudKBActive = true;
+          this.sync._cloudKnowledgeActive = true;
           this.sync._cloudSettingsActive = true;
         } catch (err) {
           console.warn('[DataStore] migrateLocalToCloud:', err);
         }
+      } else if (!cloudHasKnowledge) {
+        database.gadgetKB = [];
+        database.manualKnowledge = [];
+        database.knowledge = [];
+        console.warn('[DataStore] Base de conocimiento en nube vacía. Inicia sesión como staff y publica datos iniciales.');
       }
 
       this.sync.applyUnifiedKnowledge(database);
@@ -4412,7 +4435,11 @@ const ARTURITO_GADGET_KB_SEED = [
         if (callbacks.onSync) callbacks.onSync(type);
       });
 
-      return { mode: 'cloud', migrated };
+      return {
+        mode: 'cloud',
+        migrated,
+        cloudHasKnowledge: this.sync._cloudKnowledgeActive === true
+      };
     }
 
     async forceMigrate(database) {
@@ -4556,11 +4583,12 @@ const ARTURITO_GADGET_KB_SEED = [
             sync.bindTicketsWatch(options.database, sync._liveOnUpdate);
           }
         });
+        let boot = { mode: 'cloud', cloudHasKnowledge: false };
         if (options.database) {
-          await store.bootstrap(options.database, { onSync: options.onSync });
+          boot = await store.bootstrap(options.database, { onSync: options.onSync });
         }
         UIManager.setCloudBadge(true, 'Firebase · ' + fb.getCondominioId());
-        return true;
+        return boot || true;
       } catch (err) {
         console.warn('[ArturitoCloud] init:', err);
         UIManager.setCloudBadge(false, 'Error Firebase');
@@ -6603,7 +6631,12 @@ const AuthModule = {
       try {
         const user = await ArturitoCloud.auth.login(email, pass);
         this.currentUser = user;
+        if (!ArturitoCloud.sync?._cloudKnowledgeActive && !(database.gadgetKB || []).length) {
+          DatabaseModule.seedGadgetTemplate();
+        }
         await DatabaseModule.save('full', { fullSync: true });
+        ArturitoCloud.sync._cloudKnowledgeActive = !!((database.gadgetKB || []).length || (database.manualKnowledge || []).length);
+        await RAGModule.rebuildIndex();
         this.hideLogin();
         App.setMode('admin');
         toast('Bienvenido, ' + user.nombre, 'success');
@@ -11715,6 +11748,7 @@ const App = {
     };
 
     let cloudOk = false;
+    let cloudBoot = null;
     if (typeof ArturitoCloud !== 'undefined') {
       ArturitoCloud.UIManager.bindFirebaseConfigForm(ArturitoCloud.fb, async () => {
         await ArturitoCloud.init({ database, ...cloudHandlers });
@@ -11725,7 +11759,8 @@ const App = {
       });
       try {
         this.showCloudSyncLoading(true, 'Descargando configuración y conocimiento...');
-        cloudOk = await ArturitoCloud.init({ database, ...cloudHandlers });
+        cloudBoot = await ArturitoCloud.init({ database, ...cloudHandlers });
+        cloudOk = !!cloudBoot;
       } catch (err) {
         console.warn('[ArturitoCloud] init falló:', err);
         ArturitoCloud.UIManager.setCloudBadge(false, 'Error Firebase');
@@ -11741,6 +11776,9 @@ const App = {
       KnowledgeBaseModule.syncFromGadget();
       await RAGModule.rebuildIndex();
       this.showCloudSyncLoading(false);
+      if (cloudBoot && cloudBoot.cloudHasKnowledge === false) {
+        toast('Base de conocimiento en nube vacía. Inicia sesión como administrador y publica datos iniciales.', 'warning');
+      }
       void TicketEmailDebug.audit('Al cargar la app');
     } else if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled?.()) {
       this.showCloudSyncLoading(false);
