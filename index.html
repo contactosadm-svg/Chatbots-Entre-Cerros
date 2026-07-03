@@ -2565,14 +2565,27 @@ const ARTURITO_GADGET_KB_SEED = [
       }
       try {
         this._modules = await loadFirebaseModules();
-        const { initializeApp, getAuth, getFirestore, getStorage } = this._modules;
-        this.app = initializeApp(config);
+        const { initializeApp, getApps, getApp, deleteApp, getAuth, getFirestore, getStorage } = this._modules;
+        const appKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+        const sameFirebaseApp = (app) => appKeys.every((key) =>
+          String(app?.options?.[key] || '') === String(config?.[key] || '')
+        );
+        const existingApp = getApps?.().length ? getApp() : null;
+        if (existingApp && sameFirebaseApp(existingApp)) {
+          this.app = existingApp;
+        } else {
+          if (existingApp && deleteApp) {
+            this.teardown();
+            await deleteApp(existingApp);
+          }
+          this.app = initializeApp(config);
+        }
         this.auth = getAuth(this.app);
         const dbId = config.firestoreDatabaseId || '(default)';
         this.db = getFirestore(this.app, dbId);
         this.storage = getStorage(this.app);
         this.enabled = true;
-        this.condominioId = config.condominioId || config.projectId || 'default';
+        this.condominioId = config.condominioId || DEFAULT_FIREBASE_CONFIG.condominioId || 'entre-cerros';
         this.firestoreDatabaseId = dbId;
         this.saveConfig({ ...config, condominioId: this.condominioId, firestoreDatabaseId: dbId });
         return true;
@@ -2643,8 +2656,17 @@ const ARTURITO_GADGET_KB_SEED = [
 
     async loadProfile(uid) {
       const { getDoc } = this.fb._modules;
-      const snap = await getDoc(this.fb.doc(`users/${uid}`));
-      return snap.exists() ? snap.data() : null;
+      try {
+        const snap = await getDoc(this.fb.doc(`users/${uid}`));
+        return snap.exists() ? snap.data() : null;
+      } catch (err) {
+        const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
+        if (denied) {
+          console.info('[Auth] Perfil no disponible para la sesión actual.');
+          return null;
+        }
+        throw err;
+      }
     }
 
     mapUser(fbUser, profile) {
@@ -2930,7 +2952,7 @@ const ARTURITO_GADGET_KB_SEED = [
           global.TicketEmailDebug?.log('Correo encolado', { path: `mail/${mailId}`, database: '(default)' });
         }
       } catch (err) {
-        console.warn('[TicketEmail] queue mail/ desde app:', err);
+        console.info('[TicketEmail] No se pudo preparar correo desde la app:', err?.message || err);
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message));
         global.toast?.(
           denied
@@ -3738,7 +3760,12 @@ const ARTURITO_GADGET_KB_SEED = [
         if (this.auth?.isStaff?.(this.auth.currentUser) && await this.pullChatInteractions(database, forceServer)) changes.analytics = true;
         if (await this.pullTrainingData(forceServer)) changes.training = true;
       } catch (err) {
-        console.warn('[CloudSync] pullPublicCloudData:', err);
+        const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
+        if (denied) {
+          console.info('[CloudSync] Datos públicos no disponibles para esta sesión; usando respaldo local.');
+        } else {
+          console.warn('[CloudSync] pullPublicCloudData:', err);
+        }
       }
       return changes;
     }
@@ -3764,7 +3791,12 @@ const ARTURITO_GADGET_KB_SEED = [
         const snap = await getDoc(ref);
         if (snap.exists()) remote = snap.data() || {};
       } catch (err) {
-        console.warn('[CloudSync] ensureTicketEmailSettings read:', err);
+        const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
+        if (denied) {
+          console.info('[CloudSync] Configuración de correo no disponible para esta sesión.');
+        } else {
+          console.warn('[CloudSync] ensureTicketEmailSettings read:', err);
+        }
         return false;
       }
       const defs = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
@@ -4505,7 +4537,7 @@ const ARTURITO_GADGET_KB_SEED = [
           storageBucket: document.getElementById('fbStorageBucket').value.trim(),
           messagingSenderId: document.getElementById('fbMessagingSenderId').value.trim(),
           appId: document.getElementById('fbAppId').value.trim(),
-          condominioId: document.getElementById('fbCondominioId').value.trim() || document.getElementById('fbProjectId').value.trim(),
+          condominioId: document.getElementById('fbCondominioId').value.trim() || DEFAULT_FIREBASE_CONFIG.condominioId,
           firestoreDatabaseId: document.getElementById('fbFirestoreDatabaseId')?.value.trim() || '(default)'
         };
         try {
@@ -4528,7 +4560,7 @@ const ARTURITO_GADGET_KB_SEED = [
             storageBucket: document.getElementById('fbStorageBucket').value.trim(),
             messagingSenderId: document.getElementById('fbMessagingSenderId').value.trim(),
             appId: document.getElementById('fbAppId').value.trim(),
-            condominioId: document.getElementById('fbCondominioId').value.trim(),
+            condominioId: document.getElementById('fbCondominioId').value.trim() || DEFAULT_FIREBASE_CONFIG.condominioId,
             firestoreDatabaseId: document.getElementById('fbFirestoreDatabaseId')?.value.trim() || '(default)'
           };
           await fb.init(config);
@@ -6591,7 +6623,7 @@ const SettingsModule = {
     if (result?.cloud) {
       toast('Configuración sincronizada en la nube — visible en todos los dispositivos', 'success');
     } else {
-      toast('No se guardó en la nube. Revisa conexión y reglas Firestore.', 'error');
+      toast('No se guardó en la nube. Revisa tu conexión e intenta nuevamente.', 'error');
     }
   },
   /** Alterna tema claro/oscuro */
@@ -8511,8 +8543,8 @@ const TicketEmailDebug = {
     else console.log('[TicketEmail]', msg);
   },
   warn(msg, data) {
-    if (data !== undefined) console.warn('[TicketEmail]', msg, data);
-    else console.warn('[TicketEmail]', msg);
+    if (data !== undefined) console.info('[TicketEmail]', msg, data);
+    else console.info('[TicketEmail]', msg);
   },
   async readCloudSettings() {
     if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) {
@@ -8554,13 +8586,13 @@ const TicketEmailDebug = {
       }
       const cloud = await this.readCloudSettings();
       if (!cloud.ok) {
-        this.warn('No se pudo leer Firestore', cloud.error);
+        this.log('Diagnóstico de nube no disponible', cloud.error);
         return cloud;
       }
-      const s = cloud.data || {};
+      const s = { ...local, ...(cloud.data || {}) };
       const issues = [];
       if (!String(s.notifyAdminEmail || '').trim()) {
-        issues.push('Falta notifyAdminEmail → Configuración → correo admin → Guardar');
+        issues.push('Falta correo de administración para recibir tickets.');
       }
       this.log('Envío vía mail/', 'Extensión Trigger Email configurada para Entre Cerros');
       this.log('Config Firestore (settings/main)', {
@@ -8722,7 +8754,7 @@ const TicketEmailDebug = {
       this._mailCache[ticketId] = snap.data();
       return snap.data();
     } catch (err) {
-      console.warn('[TicketEmail] fetchMailStatus', err);
+      console.info('[TicketEmail] Estado de correo no disponible:', err?.message || err);
       return null;
     }
   },
@@ -8742,7 +8774,7 @@ const TicketEmailDebug = {
       const snap = await getDocs(q);
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch (err) {
-      console.warn('[TicketEmail] loadMailLogs', err);
+      console.info('[TicketEmail] Historial de correo no disponible:', err?.message || err);
       return [];
     }
   },
