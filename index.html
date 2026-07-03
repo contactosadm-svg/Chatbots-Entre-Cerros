@@ -1,7 +1,6 @@
 <!--
   Chatbots Entre Cerros — Monolito único (todo el frontend en este archivo).
   Correo tickets: cola mail/ → extensión Firebase Trigger Email.
-  Desplegar: bash deploy.sh (desde Chatbots Entre Cerros/)
 -->
 <!DOCTYPE html>
 <html lang="es">
@@ -1234,7 +1233,7 @@ body.mode-client #adminApp{display:none!important}
             <div class="form-group"><label>TTL documentos mail</label><input type="text" id="setFirestoreTtl" value="Never" readonly></div>
             <input type="hidden" id="setTicketEmailMode" value="extension">
             <p id="smtpConfigStatus" class="ticket-hint" style="margin:0 0 .5rem"></p>
-            <p class="ticket-hint" style="margin:0 0 .75rem">Al crear ticket se escribe <code>mail/TK-…</code> en la base <strong>(default)</strong>. La extensión <strong>Trigger Email</strong> envía el correo configurado para Entre Cerros. Si no llega: <code>bash deploy.sh</code> e instala/actualiza la extensión.</p>
+            <p class="ticket-hint" style="margin:0 0 .75rem">Al crear ticket se prepara un correo de confirmación para Entre Cerros. Si no llega, revisa el diagnóstico de correo.</p>
             <div class="form-group full" style="display:flex;gap:.5rem;flex-wrap:wrap">
               <button type="button" class="btn btn-secondary btn-sm" id="btnVerifyTicketEmail">Verificar correo</button>
               <button type="button" class="btn btn-secondary btn-sm" id="btnDiagnoseTriggerEmail">Diagnóstico Trigger Email</button>
@@ -2935,8 +2934,8 @@ const ARTURITO_GADGET_KB_SEED = [
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message));
         global.toast?.(
           denied
-            ? 'Ticket guardado. Publica reglas: bash deploy.sh'
-            : 'Ticket guardado pero no se encoló el correo en mail/. Revisa consola.',
+            ? 'Ticket guardado. No se pudo preparar el correo de confirmación.'
+            : 'Ticket guardado, pero el correo de confirmación quedó pendiente.',
           'warning'
         );
       }
@@ -4387,7 +4386,7 @@ const ARTURITO_GADGET_KB_SEED = [
           const msg = lastErr.message || String(lastErr);
           global.toast?.(
             msg.includes('permission') || msg.includes('PERMISSION_DENIED')
-              ? 'Sin permiso en Firestore (base (default)). Publica firestore.rules: bash deploy.sh'
+              ? 'No se pudo guardar en la nube. Verifica tu sesión e intenta nuevamente.'
               : 'No se guardó en la nube. Revisa tu conexión e intenta de nuevo.',
             'error'
           );
@@ -8584,7 +8583,7 @@ const TicketEmailDebug = {
       if (issues.length) {
         issues.forEach((i) => this.warn('Problema detectado', i));
       } else {
-        this.log('Checklist OK', 'Crea ticket → ver mail/TK-… → delivery.state SUCCESS. Si falla: bash deploy.sh');
+        this.log('Checklist OK', 'Crea ticket y verifica que el correo quede enviado correctamente.');
       }
       return { ok: issues.length === 0, issues, settings: s };
     } catch (err) {
@@ -8678,7 +8677,7 @@ const TicketEmailDebug = {
           <div><strong>Pendiente más antiguo:</strong> ${oldestPendingMinutes} min</div>
         </div>
         ${errHtml}
-        <p style="font-size:.78rem;color:var(--text-muted);margin:.75rem 0 0">Si hay pendientes antiguos: Firebase Console → Extensions → Trigger Email → Logs. Redeploy: <code>bash deploy.sh</code></p>
+        <p style="font-size:.78rem;color:var(--text-muted);margin:.75rem 0 0">Si hay pendientes antiguos, revisa el diagnóstico del servicio de correo.</p>
         <button type="button" class="btn btn-primary btn-sm" style="margin-top:1rem">Cerrar</button>
       </div>`;
       modal.querySelector('button')?.addEventListener('click', () => modal.remove());
@@ -8763,7 +8762,7 @@ const TicketEmailDebug = {
         Ruta: <code>mail/${this._escapeHtml(ticketId)}</code> · Base (default)<br>
         ${p.status === 'sent' ? `Enviado: ${sentStr}` : ''}
         ${p.status === 'error' ? `Error: ${this._escapeHtml(p.detail)}` : ''}
-        ${p.status === 'pending' ? 'Esperando extensión Trigger Email (bash deploy.sh si persiste)' : ''}
+        ${p.status === 'pending' ? 'Esperando confirmación del servicio de correo' : ''}
       </div>`;
     const deliveryDetail = data?.delivery?.error || data?.delivery?.state || data?.status;
     logEl.innerHTML = deliveryDetail
@@ -9105,7 +9104,7 @@ const TicketEmailDebug = {
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message));
         if (denied) {
           this.warn('Diagnóstico mail/ bloqueado por reglas', { mailId, database: dbId });
-          if (notifyUser) toast('Ticket creado. Publica reglas: bash deploy.sh', 'warning');
+          if (notifyUser) toast('Ticket creado. El correo de confirmación quedó pendiente.', 'warning');
           return { ok: false, permission: true };
         }
         this.warn('Error leyendo mail/' + mailId, err.message);
@@ -9115,11 +9114,10 @@ const TicketEmailDebug = {
     this.warn('Sin delivery — extensión Trigger Email no procesó el correo', {
       mailId,
       path: `mail/${mailId}`,
-      database: dbId,
-      solucion: 'cd "Chatbots Entre Cerros" && bash deploy.sh'
+      database: dbId
     });
     if (notifyUser) {
-      toast('Correo pendiente. Ejecuta bash deploy.sh para instalar Trigger Email.', 'warning');
+      toast('Correo pendiente. La confirmación se enviará cuando el servicio esté disponible.', 'warning');
     }
     return { ok: false, timeout: true };
   },
@@ -11790,7 +11788,7 @@ const App = {
       } catch (err) {
         console.warn('[ArturitoCloud] init falló:', err);
         ArturitoCloud.UIManager.setCloudBadge(false, 'Error Firebase');
-        this.showCloudSyncLoading(true, 'Sin conexión a la nube', 'Publica firestore.rules en la base (default) (bash deploy.sh) o revisa tu internet.');
+        this.showCloudSyncLoading(true, 'Sin conexión a la nube', 'Revisa tu conexión e intenta recargar la página.');
         await new Promise(r => setTimeout(r, 2200));
       }
     } else {
@@ -11808,7 +11806,7 @@ const App = {
       toast('Modo consulta de tickets activo. Algunas funciones admin pueden estar limitadas.', 'warning');
     } else {
       this.showCloudSyncLoading(true, 'Conexión a la nube requerida',
-        'Todos los datos están en Firestore ((default)). Ejecuta bash deploy.sh, verifica internet y recarga.');
+        'No pudimos conectar con los datos del edificio. Verifica internet y recarga.');
       return;
     }
 
