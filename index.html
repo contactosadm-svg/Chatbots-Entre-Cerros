@@ -3664,6 +3664,7 @@ const ARTURITO_GADGET_KB_SEED = [
 
     async pullChatInteractions(database, forceServer = true) {
       if (!this.fb.isEnabled()) return false;
+      if (!this.auth?.isStaff?.(this.auth.currentUser)) return false;
       const { getDocs, getDocsFromServer } = this.fb._modules;
       let snap = null;
       if (forceServer && getDocsFromServer) {
@@ -3735,7 +3736,7 @@ const ARTURITO_GADGET_KB_SEED = [
         if (changes.gadgetKB || changes.knowledge || settingsSnap?.exists()) {
           this.applyUnifiedKnowledge(database);
         }
-        if (await this.pullChatInteractions(database, forceServer)) changes.analytics = true;
+        if (this.auth?.isStaff?.(this.auth.currentUser) && await this.pullChatInteractions(database, forceServer)) changes.analytics = true;
         if (await this.pullTrainingData(forceServer)) changes.training = true;
       } catch (err) {
         console.warn('[CloudSync] pullPublicCloudData:', err);
@@ -4214,22 +4215,24 @@ const ARTURITO_GADGET_KB_SEED = [
       );
       this._unsubs.push(manualUnsub);
 
-      const analyticsUnsub = onSnapshot(
-        this.fb.col('chat_interactions'),
-        (snap) => {
-          if (this._pushing) return;
-          const remote = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
-            .slice(-500);
-          if (JSON.stringify(remote) === JSON.stringify(database.chatInteractions || [])) return;
-          database.chatInteractions = remote;
-          database.settings = database.settings || {};
-          database.settings.chatAnalytics = this.rebuildChatAnalyticsSummary(remote);
-          if (onUpdate) onUpdate('analytics');
-        },
-        this._snapErr('chat_interactions')
-      );
-      this._unsubs.push(analyticsUnsub);
+      if (this.auth?.isStaff?.(this.auth.currentUser)) {
+        const analyticsUnsub = onSnapshot(
+          this.fb.col('chat_interactions'),
+          (snap) => {
+            if (this._pushing) return;
+            const remote = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+              .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+              .slice(-500);
+            if (JSON.stringify(remote) === JSON.stringify(database.chatInteractions || [])) return;
+            database.chatInteractions = remote;
+            database.settings = database.settings || {};
+            database.settings.chatAnalytics = this.rebuildChatAnalyticsSummary(remote);
+            if (onUpdate) onUpdate('analytics');
+          },
+          this._snapErr('chat_interactions')
+        );
+        this._unsubs.push(analyticsUnsub);
+      }
 
       const trainingDocsUnsub = onSnapshot(
         this.fb.col('training_documents'),
@@ -4405,7 +4408,9 @@ const ARTURITO_GADGET_KB_SEED = [
 
       let migrated = false;
       await this.sync.pullPublicCloudData(database, true);
-      await this.sync.ensureTicketEmailSettings(database);
+      if (this.sync.auth?.isStaff?.(this.sync.auth.currentUser)) {
+        await this.sync.ensureTicketEmailSettings(database);
+      }
 
       const cloudHasKnowledge = this.sync._cloudKnowledgeActive === true;
       const canSeedCloud = this.sync.auth?.isStaff?.(this.sync.auth.currentUser) === true;
