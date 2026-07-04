@@ -2879,6 +2879,9 @@ const ARTURITO_GADGET_CATEGORIES = {
       if (remote.updatedAt || remote.buildingName !== undefined) {
         this._cloudSettingsActive = true;
       }
+      if (typeof ensureTicketEmailRoutingDefaults === 'function') {
+        ensureTicketEmailRoutingDefaults(merged);
+      }
       return merged;
     }
 
@@ -3103,6 +3106,12 @@ const ARTURITO_GADGET_CATEGORIES = {
       };
       pickArray('ticketCategories');
       pickArray('adminExcludedCategories');
+      if (database.settings.emailRouting && JSON.stringify(database.settings.emailRouting) !== JSON.stringify(remote.emailRouting || null)) {
+        patch.emailRouting = JSON.parse(JSON.stringify(database.settings.emailRouting));
+      }
+      if (database.settings.mayordomoEmail && String(database.settings.mayordomoEmail) !== String(remote.mayordomoEmail || '')) {
+        patch.mayordomoEmail = database.settings.mayordomoEmail;
+      }
       const canonical = typeof resolvePublicAppUrl === 'function' ? resolvePublicAppUrl() : DEFAULT_PUBLIC_APP_URL;
       if (String(remote.publicAppUrl || '').trim().replace(/\/$/, '') !== canonical) {
         patch.publicAppUrl = canonical;
@@ -4086,6 +4095,14 @@ function buildMayordomoRouting(email, categories) {
     collection: MAYORDOMO_COLLECTION
   }];
 }
+function isLegacyBroadMayordomoRoute(categories = []) {
+  const normalized = new Set((categories || []).map(normalizeCategoryKey));
+  if (normalized.has('*')) return true;
+  const legacyDefaults = DEFAULT_TICKET_CATEGORIES
+    .filter((cat) => normalizeCategoryKey(cat) !== normalizeCategoryKey(TAG_TICKET_CATEGORY))
+    .map(normalizeCategoryKey);
+  return legacyDefaults.length > 0 && legacyDefaults.every((cat) => normalized.has(cat));
+}
 function parseEmailRoutingRules(raw, ticketCategories = getTicketCategories()) {
   const allowed = new Set(ticketCategories.map((c) => c.toLowerCase()));
   return String(raw || '').split(/\n+/).map((line) => line.trim()).filter(Boolean).map((line, index) => {
@@ -4132,11 +4149,14 @@ function ensureTicketEmailRoutingDefaults(settings = {}) {
     : [];
   const mayordomoIndex = routes.findIndex((route) => String(route.collection || '') === MAYORDOMO_COLLECTION || route.id === 'mayordomo');
   if (mayordomoIndex >= 0) {
+    const nextCategories = isLegacyBroadMayordomoRoute(routes[mayordomoIndex].categories)
+      ? DEFAULT_MAYORDOMO_CATEGORIES.slice()
+      : mergeCategoryLists(routes[mayordomoIndex].categories, DEFAULT_MAYORDOMO_CATEGORIES)
+        .filter((cat) => settings.ticketCategories.some((ticketCat) => normalizeCategoryKey(ticketCat) === normalizeCategoryKey(cat)));
     routes[mayordomoIndex] = {
       ...routes[mayordomoIndex],
       id: routes[mayordomoIndex].id || 'mayordomo',
-      categories: mergeCategoryLists(routes[mayordomoIndex].categories, DEFAULT_MAYORDOMO_CATEGORIES)
-        .filter((cat) => settings.ticketCategories.some((ticketCat) => normalizeCategoryKey(ticketCat) === normalizeCategoryKey(cat))),
+      categories: nextCategories,
       to: Array.isArray(routes[mayordomoIndex].to) && routes[mayordomoIndex].to.length ? routes[mayordomoIndex].to : [mayordomoEmail],
       cc: Array.isArray(routes[mayordomoIndex].cc) ? routes[mayordomoIndex].cc : [],
       collection: MAYORDOMO_COLLECTION
