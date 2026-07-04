@@ -1221,19 +1221,19 @@ body.mode-client #adminApp{display:none!important}
               <div style="font-weight:700;margin-bottom:.75rem;font-size:.95rem">Notificaciones por correo (tickets)</div>
             </div>
             <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="administracion@entrecerros.cl" required></div>
-            <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://kike01f.github.io/Chatbots-Entre-Cerros/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
+            <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://chatbots-entre-cerros.web.app"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://chatbots-entre-cerros.web.app/admin"></div>
-            <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="Configurar en Firebase Trigger Email" autocomplete="username" readonly title="Configurado en extensions/firestore-send-email.env"></div>
+            <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en Firebase Trigger Email"></div>
             <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="administracion@entrecerros.cl" readonly></div>
             <div class="form-group"><label>Contraseña de aplicación Google</label><input type="password" id="setSmtpAppPassword" placeholder="Configurada en la extensión Trigger Email" autocomplete="new-password" readonly></div>
-            <div class="form-group full"><label>URI SMTP (extensión Firebase)</label><input type="text" id="setSmtpConnectionUri" readonly placeholder="extensions/firestore-send-email.env"></div>
+            <div class="form-group full"><label>URI SMTP (extensión Firebase)</label><input type="text" id="setSmtpConnectionUri" readonly placeholder="smtps://usuario:***@smtp.gmail.com:465"></div>
             <div class="form-group"><label>Colección de correo</label><input type="text" id="setMailCollection" value="mail" readonly></div>
             <div class="form-group"><label>Autenticación SMTP</label><input type="text" id="setSmtpAuthType" value="Username &amp; Password" readonly></div>
             <div class="form-group"><label>Puerto / TLS</label><input type="text" id="setSmtpPort" value="465 (smtps, seguro)" readonly></div>
             <div class="form-group"><label>TTL documentos mail</label><input type="text" id="setFirestoreTtl" value="Never" readonly></div>
             <input type="hidden" id="setTicketEmailMode" value="extension">
             <p id="smtpConfigStatus" class="ticket-hint" style="margin:0 0 .5rem"></p>
-            <p class="ticket-hint" style="margin:0 0 .75rem">Al crear ticket se prepara un correo de confirmación para Entre Cerros. Si no llega, revisa el diagnóstico de correo.</p>
+            <p class="ticket-hint" style="margin:0 0 .75rem">Al crear ticket se escribe <code>mail/TK-…</code> en la base <strong>chatbotentrecerros</strong>. Trigger Email envía el aviso al administrador <strong>conserjeria.wm815@gmail.com</strong>.</p>
             <div class="form-group full" style="display:flex;gap:.5rem;flex-wrap:wrap">
               <button type="button" class="btn btn-secondary btn-sm" id="btnVerifyTicketEmail">Verificar correo</button>
               <button type="button" class="btn btn-secondary btn-sm" id="btnDiagnoseTriggerEmail">Diagnóstico Trigger Email</button>
@@ -1551,10 +1551,12 @@ const ARTURITO_GADGET_CATEGORIES = {
     smtpAuthType: 'UsernamePassword',
     smtpAuthTypeLabel: 'Username & Password',
     smtpConnectionUri: '',
+    smtpMaskedUri: 'smtps://conserjeria.wm815@gmail.com:***@smtp.gmail.com:465',
+    smtpConfiguredInExtension: true,
     smtpFromEmail: 'conserjeria.wm815@gmail.com',
     smtpReplyTo: 'conserjeria.wm815@gmail.com',
     notifyAdminEmail: 'conserjeria.wm815@gmail.com',
-    publicAppUrl: 'https://kike01f.github.io/Chatbots-Entre-Cerros',
+    publicAppUrl: 'https://chatbots-entre-cerros.web.app',
     smtpPort: 465,
     smtpSecure: true,
     firestoreTtlType: 'Never',
@@ -2494,13 +2496,13 @@ const ARTURITO_GADGET_CATEGORIES = {
   const CLOUD_SETTINGS_KEYS = [
     'buildingName', 'logo', 'primaryColor', 'secondaryColor', 'botName',
     'welcomeMessage', 'portalTagline', 'portalHint', 'theme',
-    'notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode',
     'quickQuestions', 'topicsMenuIntro', 'showTopicsOnWelcome',
     'chatShortcuts', 'chatMessages', 'gadgetCategories', 'gadgetCategoryOrder', 'chatAnalytics', 'updatedAt'
   ];
   const CLOUD_EMAIL_KEYS = [
-    'notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode'
   ];
 
@@ -2950,7 +2952,7 @@ const ARTURITO_GADGET_CATEGORIES = {
         const val = localVal || String(defs[key] ?? '').trim();
         if (val) patch[key] = val;
       };
-      ['notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpConnectionUri', 'smtpFromEmail', 'smtpReplyTo',
+      ['notifyAdminEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
         'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType'].forEach(pick);
       if (!String(remote.adminPanelUrl || '').trim() && database.settings.adminPanelUrl) {
         patch.adminPanelUrl = database.settings.adminPanelUrl;
@@ -2958,7 +2960,7 @@ const ARTURITO_GADGET_CATEGORIES = {
       if (!String(remote.publicAppUrl || '').trim() && database.settings.publicAppUrl) {
         patch.publicAppUrl = database.settings.publicAppUrl;
       }
-      const canonical = typeof resolvePublicAppUrl === 'function' ? resolvePublicAppUrl() : 'https://kike01f.github.io/Chatbots-Entre-Cerros';
+      const canonical = typeof resolvePublicAppUrl === 'function' ? resolvePublicAppUrl() : DEFAULT_PUBLIC_APP_URL;
       if (String(remote.publicAppUrl || '').trim().replace(/\/$/, '') !== canonical) {
         patch.publicAppUrl = canonical;
       }
@@ -3008,7 +3010,6 @@ const ARTURITO_GADGET_CATEGORIES = {
         notifyAdminEmail: s.notifyAdminEmail || defs.notifyAdminEmail || '',
         publicAppUrl: s.publicAppUrl || DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: s.adminPanelUrl || 'https://chatbots-entre-cerros.web.app/admin',
-        smtpConnectionUri: s.smtpConnectionUri || defs.smtpConnectionUri || '',
         smtpFromEmail: s.smtpFromEmail || defs.smtpFromEmail || '',
         smtpReplyTo: s.smtpReplyTo || defs.smtpReplyTo || '',
         mailCollection: s.mailCollection || defs.mailCollection || 'mail',
@@ -5705,7 +5706,7 @@ const SettingsModule = {
     const gmailEl = document.getElementById('setSmtpGmail');
     if (gmailEl) gmailEl.value = s.smtpFromEmail || defs.smtpFromEmail || '';
     const uriEl = document.getElementById('setSmtpConnectionUri');
-    if (uriEl) uriEl.value = 'extensions/firestore-send-email.env';
+    if (uriEl) uriEl.value = defs.smtpMaskedUri || 'smtps://conserjeria.wm815@gmail.com:***@smtp.gmail.com:465';
     const modeEl = document.getElementById('setTicketEmailMode');
     if (modeEl) modeEl.value = 'extension';
     TicketEmailDebug.updateSmtpStatusIndicator();
@@ -7655,7 +7656,7 @@ const ChatModule = {
 };
 
 /* URL pública del chat residente — SIEMPRE usada en botones de correo */
-const DEFAULT_PUBLIC_APP_URL = 'https://kike01f.github.io/Chatbots-Entre-Cerros';
+const DEFAULT_PUBLIC_APP_URL = 'https://chatbots-entre-cerros.web.app';
 
 function resolvePublicAppUrl() {
   return DEFAULT_PUBLIC_APP_URL;
@@ -7669,10 +7670,12 @@ const TicketEmailDebug = {
   updateSmtpStatusIndicator() {
     const el = document.getElementById('smtpConfigStatus');
     if (!el) return;
-    el.innerHTML = '<strong style="color:var(--primary)">✓ Trigger Email activo</strong> — la app encola en <code>mail/</code> y la extensión Firebase envía por SMTP (<code>extensions/firestore-send-email.env</code>).';
+    const defs = globalThis.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
+    const smtp = this._maskUri(defs.smtpMaskedUri || '');
+    el.innerHTML = `<strong style="color:var(--primary)">✓ Trigger Email configurado</strong> — base <code>chatbotentrecerros</code>, cola <code>mail/</code>, SMTP <code>${smtp}</code>.`;
   },
   _maskUri(uri) {
-    if (!uri) return '(configurado en extensions/firestore-send-email.env)';
+    if (!uri) return '(configurado en Firebase Extension)';
     return String(uri).replace(/:([^:@/]+)@/, ':***@');
   },
   log(msg, data) {
@@ -7751,7 +7754,10 @@ const TicketEmailDebug = {
       });
       this.log('Infraestructura correo', {
         extension: 'firebase/firestore-send-email',
-        smtpConfig: 'extensions/firestore-send-email.env',
+        instanceDatabase: 'chatbotentrecerros',
+        instanceLocation: 'southamerica-west1',
+        smtpAuthType: 'Username & Password',
+        smtpConfig: this._maskUri((globalThis.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {}).smtpMaskedUri || ''),
         notifyAdminOnTicket: 'respaldo si la app no creó mail/',
         database: 'chatbotentrecerros',
         mailPath: 'Firestore → chatbotentrecerros → mail → doc id = TK-YYYYMMDD-0001',
@@ -7974,6 +7980,45 @@ const TicketEmailDebug = {
       toast('No se pudo reenviar: ' + (err.message || err), 'error');
     }
   },
+  async repairRecentAdminMail(maxTickets = 10) {
+    if (this._repairingRecentAdminMail) return;
+    if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled?.()) return;
+    this._repairingRecentAdminMail = true;
+    try {
+      const fb = ArturitoCloud.fb;
+      const { collection, query, orderBy, limit, getDocs, doc, getDoc, getDocFromServer } = fb._modules;
+      const cid = fb.getCondominioId();
+      let snap;
+      try {
+        snap = await getDocs(query(collection(fb.db, `condominios/${cid}/tickets`), orderBy('fechaCreacion', 'desc'), limit(maxTickets)));
+      } catch (_) {
+        snap = await getDocs(query(collection(fb.db, `condominios/${cid}/tickets`), limit(maxTickets)));
+      }
+      const recentCutoff = Date.now() - 14 * 86400000;
+      let repaired = 0;
+      for (const ticketDoc of snap.docs) {
+        const ticketId = ticketDoc.id;
+        const data = ticketDoc.data() || {};
+        const createdAt = data.fechaCreacion || data.createdAt || 0;
+        if (createdAt && createdAt < recentCutoff) continue;
+        const mailRef = doc(fb.db, 'mail', ticketId);
+        const mailSnap = getDocFromServer ? await getDocFromServer(mailRef) : await getDoc(mailRef);
+        if (mailSnap.exists()) continue;
+        await this.queueMailForTicket(ticketId, {
+          id: ticketId,
+          numeroTicket: data.numeroTicket || ticketId,
+          ...data,
+          attachments: data.attachments || data.adjuntos || []
+        });
+        repaired += 1;
+      }
+      if (repaired) this.log('Correos admin recuperados para tickets recientes', { repaired, database: fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros' });
+    } catch (err) {
+      this.warn('No se pudo reparar cola admin reciente', err?.message || err);
+    } finally {
+      this._repairingRecentAdminMail = false;
+    }
+  },
   _escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -8169,12 +8214,16 @@ const TicketEmailDebug = {
       throw new Error('Firebase no conectado');
     }
     const settingsSnap = await this.readCloudSettings();
-    const defaults = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
+    const defaults = globalThis.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
     const settings = settingsSnap.ok
       ? { ...defaults, ...database.settings, ...(settingsSnap.data || {}) }
       : { ...defaults, ...(database.settings || {}) };
     const recipients = this._parseEmails(settings?.notifyAdminEmail || defaults.notifyAdminEmail);
+    const requiredAdmin = this._parseEmails(defaults.notifyAdminEmail || 'conserjeria.wm815@gmail.com')[0];
     const to = recipients.length ? recipients : [];
+    if (requiredAdmin && !to.map((email) => email.toLowerCase()).includes(requiredAdmin.toLowerCase())) {
+      to.push(requiredAdmin);
+    }
     if (!to.length) {
       throw new Error('Falta configurar el correo del administrador de Entre Cerros');
     }
@@ -10840,7 +10889,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v35-ticket-mail-retry';",
+    "const CACHE_NAME='arturito-ai-v38-globalthis-mail';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
@@ -10997,6 +11046,7 @@ const App = {
       await RAGModule.rebuildIndex();
       this.showCloudSyncLoading(false);
       void TicketEmailDebug.audit('Al cargar la app');
+      void TicketEmailDebug.repairRecentAdminMail();
     } else {
       this.showCloudSyncLoading(true, 'Conexión a la nube requerida',
         'La app usa Firestore como fuente única. Verifica que la base chatbotentrecerros exista, esté desplegada y recarga.');
