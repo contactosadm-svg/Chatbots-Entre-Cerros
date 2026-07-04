@@ -4004,9 +4004,10 @@ const DEFAULT_CHAT_SHORTCUTS = [
   { icon: 'alert', text: 'Es urgente' },
   { icon: 'phone', text: 'Necesito contactar a conserjería' }
 ];
+const HUMAN_ESCALATION_MESSAGE = '😢 Te entiendo. Si necesitas apoyo directo, puedes hablar con una persona del equipo.\n\nSelecciona arriba a la izquierda **👤 Hablar con un humano** o llama a conserjería al **📞 +56 22 2619651**.\n\nSi quieres dejar el caso registrado para seguimiento, puedo generar una solicitud ahora.';
 const DEFAULT_CHAT_MESSAGES = {
   fallback: '',
-  escalate: 'Te entiendo — a veces uno necesita hablar con una persona del equipo.\n\nYa avisé a administración. También puedes llamar a conserjería al interno 100.\n\nMientras tanto, ¿te creo una solicitud para que quede registrado?',
+  escalate: HUMAN_ESCALATION_MESSAGE,
   ticketPrompt: 'Armemos tu solicitud. Completa el formulario y el equipo la revisará pronto.',
   ticketStatusPrompt: 'Para ver el estado de tu solicitud, escríbeme el **número de ticket** (ej. TK-20260617-0007). Lo recibiste al crear la solicitud.',
   noTickets: 'No encontré esa solicitud. Verifica el número (ej. TK-20260617-0007) o crea una nueva escribiendo "crear ticket".'
@@ -4287,7 +4288,17 @@ const ARTURITO_PERSONALITY = {
 };
 function getChatMsg(key) {
   if (key === 'fallback') return ARTURITO_PERSONALITY.getFallback();
+  if (key === 'escalate') {
+    const custom = database.settings?.chatMessages?.escalate || '';
+    return isLegacyHumanEscalationMessage(custom) ? HUMAN_ESCALATION_MESSAGE : (custom || DEFAULT_CHAT_MESSAGES.escalate);
+  }
   return database.settings?.chatMessages?.[key] || DEFAULT_CHAT_MESSAGES[key] || '';
+}
+function isLegacyHumanEscalationMessage(value) {
+  const text = String(value || '').toLowerCase();
+  return text.includes('interno 100')
+    || text.includes('ya avisé a administración')
+    || text.includes('ya avise a administracion');
 }
 const SESSION_KEY = 'arturito_admin_session';
 const ARTURITO_SVG = `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="arturitoFaceClip"><rect x="22" y="34" width="20" height="14" rx="1"/></clipPath></defs><rect x="16" y="28" width="32" height="28" rx="6" fill="#7FBA02"/><rect x="18" y="30" width="28" height="24" rx="4" fill="#8FCB1A"/><rect x="20" y="32" width="24" height="18" rx="2" fill="#1a1a1a"/><rect x="22" y="34" width="20" height="14" rx="1" fill="#2a2a2a"/><rect x="22" y="34" width="8" height="2" rx="1" fill="#fff" opacity="0.3"/><g class="blinking-eyes expression-eyes" clip-path="url(#arturitoFaceClip)"><circle cx="28" cy="40" r="2.5" fill="#7FBA02"/><circle cx="36" cy="40" r="2.5" fill="#7FBA02"/><circle cx="28.5" cy="39.5" r="1" fill="#8FCB1A"/><circle cx="36.5" cy="39.5" r="1" fill="#8FCB1A"/></g><path class="expression-mouth" d="M26 44 Q32 48 38 44" stroke="#7FBA02" stroke-width="2" stroke-linecap="round" fill="none"/><g class="waving-hand"><circle cx="50" cy="20" r="6" fill="#7FBA02" opacity="0.9"/><circle cx="50" cy="20" r="5" fill="#8FCB1A" opacity="0.7"/><path d="M46 24 L50 28 L54 24" fill="#7FBA02" opacity="0.9"/><circle cx="14" cy="18" r="4" fill="#7FBA02" opacity="0.8"/><circle cx="14" cy="18" r="3" fill="#8FCB1A" opacity="0.6"/><path d="M12 22 L14 25 L16 22" fill="#7FBA02" opacity="0.8"/></g><circle cx="24" cy="28" r="2" fill="#FFD700"/><circle cx="40" cy="28" r="2" fill="#FFD700"/><rect x="20" y="54" width="24" height="4" rx="2" fill="#5a8501"/></svg>`;
@@ -7363,15 +7374,16 @@ const ResponseEngine = {
 
   respond(userText, conv) {
     const intent = this.analyzeIntent(userText, conv);
+    const createTicketAction = { label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' };
     const ticketActions = [
-      { label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' },
+      createTicketAction,
       { label: 'Hablar con humano', icon: 'user', fn: 'ChatModule.escalateFromChat()' }
     ];
     const ctxBase = { userText, conv, intent };
 
     if (intent === 'escalate') {
       return this.finalizeResponse({
-        text: getChatMsg('escalate'), expression: 'happy', actions: ticketActions,
+        text: getChatMsg('escalate'), expression: 'happy', actions: [createTicketAction],
         analytics: this.buildAnalytics('escalate', null, true)
       }, { ...ctxBase, query: userText });
     }
@@ -8168,7 +8180,9 @@ const ChatModule = {
   },
   /** Escala a humano desde botón del chat */
   escalateFromChat() {
-    this.addBotMessage(getChatMsg('escalate'));
+    this.addBotMessage(getChatMsg('escalate'), [
+      { label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' }
+    ]);
     ArturitoModule.onAnswerFound();
   }
 };
@@ -11094,7 +11108,7 @@ const TrainingModule = {
     document.getElementById('ccShowTopicsWelcome').checked = showTopicsOnWelcome();
     document.getElementById('ccChatShortcuts').value = formatChatShortcuts(getChatShortcuts());
     document.getElementById('ccFallback').value = cm.fallback || DEFAULT_CHAT_MESSAGES.fallback;
-    document.getElementById('ccEscalate').value = cm.escalate || DEFAULT_CHAT_MESSAGES.escalate;
+    document.getElementById('ccEscalate').value = isLegacyHumanEscalationMessage(cm.escalate) ? HUMAN_ESCALATION_MESSAGE : (cm.escalate || DEFAULT_CHAT_MESSAGES.escalate);
     document.getElementById('ccTicketPrompt').value = cm.ticketPrompt || DEFAULT_CHAT_MESSAGES.ticketPrompt;
     document.getElementById('ccTicketStatusPrompt').value = cm.ticketStatusPrompt || DEFAULT_CHAT_MESSAGES.ticketStatusPrompt;
     document.getElementById('ccNoTickets').value = cm.noTickets || DEFAULT_CHAT_MESSAGES.noTickets;
