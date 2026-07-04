@@ -1224,7 +1224,7 @@ body.mode-client #adminApp{display:none!important}
             <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"></div>
             <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en Firebase Trigger Email"></div>
-            <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="administracion@entrecerros.cl" readonly></div>
+            <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="conserjeria.wm815@gmail.com"></div>
             <div class="form-group"><label>Contraseña de aplicación Google</label><input type="password" id="setSmtpAppPassword" placeholder="Configurada en la extensión Trigger Email" autocomplete="new-password" readonly></div>
             <div class="form-group full"><label>URI SMTP (extensión Firebase)</label><input type="text" id="setSmtpConnectionUri" readonly placeholder="smtps://usuario:***@smtp.gmail.com:465"></div>
             <div class="form-group"><label>Colección de correo</label><input type="text" id="setMailCollection" value="mail" readonly></div>
@@ -5778,7 +5778,12 @@ const SettingsModule = {
     }
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || DEFAULT_PUBLIC_APP_URL;
     database.settings.publicAppUrl = resolvePublicAppUrl();
-    database.settings.smtpReplyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || database.settings.smtpReplyTo || '';
+    const replyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || '';
+    if (replyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+      toast('Ingresa un correo válido en REPLY-TO', 'warning');
+      return;
+    }
+    database.settings.smtpReplyTo = replyTo || (window.ARTURITO_FIREBASE_EMAIL_DEFAULTS?.smtpReplyTo || 'conserjeria.wm815@gmail.com');
     database.settings.mailCollection = document.getElementById('setMailCollection')?.value.trim() || 'mail';
     database.settings.firestoreLocation = database.settings.firestoreLocation || 'southamerica-west1';
     database.settings.smtpAuthType = database.settings.smtpAuthType || 'UsernamePassword';
@@ -10907,7 +10912,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v40-cloud-ticket-sync';",
+    "const CACHE_NAME='arturito-ai-v41-editable-reply-to';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
