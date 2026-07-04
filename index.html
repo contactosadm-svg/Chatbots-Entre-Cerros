@@ -4350,7 +4350,7 @@ const IconSVG = {
 function icon(name, size = 'sm') { return IconSVG.html(name, size); }
 function actionBtn(name, onclick, title, danger = false) {
   const cls = danger ? 'btn btn-danger btn-sm btn-icon' : 'btn btn-secondary btn-sm btn-icon';
-  return `<button type="button" class="${cls}" onclick="${onclick}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${icon(name, 'sm')}</button>`;
+  return `<button type="button" class="${cls}" onclick="${escapeHtml(onclick)}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${icon(name, 'sm')}</button>`;
 }
 function hydrateIcons(root = document) {
   root.querySelectorAll('[data-icon]').forEach(el => {
@@ -4651,6 +4651,7 @@ function badgePriority(p) {
   return `<span class="badge badge-${m[p]||'medium'}">${p}</span>`;
 }
 function escapeHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function jsString(value) { return JSON.stringify(String(value ?? '')); }
 function formatBytes(n) {
   if (!n) return '0 B';
   const u = ['B','KB','MB','GB']; let i = 0;
@@ -10949,10 +10950,10 @@ const TrainingModule = {
         <div class="doc-item-meta">${(d.type || '').toUpperCase()} · ${formatBytes(d.size)} · ${(d.charCount||0).toLocaleString('es-CL')} chars · ${d.topicCount || RAGModule.getTopicsByDoc(d.id).length || 0} temas · ${fmtDate(d.createdAt)}</div>
       </div>
       <div class="doc-item-actions">
-        ${actionBtn('analyze', `TrainingModule.openTopicAnalysis('${d.id}')`, 'Análisis por tema')}
-        ${actionBtn('eye', `TrainingModule.previewDoc('${d.id}')`, 'Vista previa')}
-        ${actionBtn('edit', `TrainingModule.openEditDocument('${d.id}')`, 'Editar')}
-        ${actionBtn('trash', `TrainingModule.removeDoc('${d.id}')`, 'Eliminar', true)}
+        ${actionBtn('analyze', `TrainingModule.openTopicAnalysis(${jsString(d.id)})`, 'Análisis por tema')}
+        ${actionBtn('eye', `TrainingModule.previewDoc(${jsString(d.id)})`, 'Vista previa')}
+        ${actionBtn('edit', `TrainingModule.openEditDocument(${jsString(d.id)})`, 'Editar')}
+        ${actionBtn('trash', `TrainingModule.removeDoc(${jsString(d.id)})`, 'Eliminar', true)}
       </div>
     </div>`).join('');
   },
@@ -10965,7 +10966,7 @@ const TrainingModule = {
     let html = topics.length ? '<div class="topic-list">' + topics.map(t =>
       `<div class="topic-chip"><span class="topic-chip-cat">${escapeHtml(t.category)}</span><div style="flex:1"><div class="topic-chip-title">${escapeHtml(t.title)}</div><div class="topic-chip-summary">${escapeHtml(t.summary)}</div>
       <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem">${(t.keyPoints||[]).length} puntos clave · Confianza ${t.confidence||'—'}%</div></div>
-      <button class="btn btn-secondary btn-sm" onclick="TrainingModule.openEditTopic('${t.id}')">${icon('edit','sm')}</button></div>`
+      <button class="btn btn-secondary btn-sm" onclick="TrainingModule.openEditTopic(${escapeHtml(jsString(t.id))})">${icon('edit','sm')}</button></div>`
     ).join('') + '</div><hr style="border-color:var(--border);margin:1rem 0"><strong>Contenido completo:</strong><br><br>' : '';
     document.getElementById('docPreviewContent').innerHTML = html + escapeHtml((doc.content || '').substring(0, 6000)) + ((doc.content||'').length > 6000 ? '\n\n[... truncado ...]' : '');
     openModal('modalDocPreview');
@@ -11108,8 +11109,8 @@ const TrainingModule = {
         sortedItems.map((e, i) => `<div class="kb-gadget-entry${e.enabled === false ? ' disabled' : ''}" draggable="true" data-id="${escapeHtml(e.id)}" data-category="${escapeHtml(catKey)}">
           <span class="kb-gadget-drag-handle" title="Arrastrar para reordenar">⠿</span>
           <div class="kb-gadget-order-col">
-            <button type="button" title="Subir" ${i === 0 ? 'disabled' : ''} onclick="TrainingModule.moveGadgetTopic('${e.id}',-1)">↑</button>
-            <button type="button" title="Bajar" ${i === sortedItems.length - 1 ? 'disabled' : ''} onclick="TrainingModule.moveGadgetTopic('${e.id}',1)">↓</button>
+            <button type="button" title="Subir" ${i === 0 ? 'disabled' : ''} onclick="TrainingModule.moveGadgetTopic(${escapeHtml(jsString(e.id))},-1)">↑</button>
+            <button type="button" title="Bajar" ${i === sortedItems.length - 1 ? 'disabled' : ''} onclick="TrainingModule.moveGadgetTopic(${escapeHtml(jsString(e.id))},1)">↓</button>
           </div>
           <div class="kb-gadget-entry-main">
           <div class="kb-gadget-entry-header">
@@ -11303,7 +11304,7 @@ const TrainingModule = {
     container.innerHTML = Object.entries(groups).map(([docId, g]) => `
       <div class="doc-group-header">
         <span>${icon('document','sm')} ${escapeHtml(g.docName || 'Documento')}</span>
-        <button class="btn btn-primary btn-sm" onclick="TrainingModule.openTopicAnalysis('${docId}')">${icon('analyze','sm')} Ver / editar análisis</button>
+        <button class="btn btn-primary btn-sm" onclick="TrainingModule.openTopicAnalysis(${escapeHtml(jsString(docId))})">${icon('analyze','sm')} Ver / editar análisis</button>
       </div>
       ${g.topics.map(t => `<div class="topic-analysis-card">
         <div class="topic-analysis-card-header">
@@ -11318,8 +11319,8 @@ const TrainingModule = {
         ${(t.keyPoints||[]).length ? `<div class="analysis-section"><label>Puntos clave</label><ul class="analysis-list">${t.keyPoints.map(p=>`<li>${escapeHtml(p)}</li>`).join('')}</ul></div>` : ''}
         ${(t.keywords||[]).length ? `<div class="analysis-section"><label>Palabras clave</label><div class="analysis-tags">${t.keywords.map(k=>`<span class="analysis-tag">${escapeHtml(k)}</span>`).join('')}</div></div>` : ''}
         <div style="display:flex;gap:.35rem;margin-top:.75rem;justify-content:flex-end">
-          ${actionBtn('edit', `TrainingModule.openEditTopic('${t.id}')`, 'Editar')}
-          ${actionBtn('trash', `TrainingModule.removeTopic('${t.id}')`, 'Eliminar', true)}
+          ${actionBtn('edit', `TrainingModule.openEditTopic(${jsString(t.id)})`, 'Editar')}
+          ${actionBtn('trash', `TrainingModule.removeTopic(${jsString(t.id)})`, 'Eliminar', true)}
         </div>
       </div>`).join('')}
     `).join('');
