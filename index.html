@@ -8101,11 +8101,20 @@ const ChatModule = {
 const DEFAULT_PUBLIC_APP_URL = 'https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/';
 
 function resolvePublicAppUrl() {
+  try {
+    if (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null') {
+      const path = window.location.pathname || '/';
+      const basePath = path.endsWith('/') ? path : path.replace(/\/[^/]*$/, '/');
+      return new URL(basePath, window.location.origin).href;
+    }
+  } catch (err) {
+    console.warn('[public-url] fallback DEFAULT_PUBLIC_APP_URL:', err?.message || err);
+  }
   return DEFAULT_PUBLIC_APP_URL;
 }
 
 function buildPublicAppUrl(pathAndQuery = '') {
-  return `${DEFAULT_PUBLIC_APP_URL.replace(/\/+$/, '')}/${String(pathAndQuery).replace(/^\/+/, '')}`;
+  return `${resolvePublicAppUrl().replace(/\/+$/, '')}/${String(pathAndQuery).replace(/^\/+/, '')}`;
 }
 
 window.DEFAULT_PUBLIC_APP_URL = DEFAULT_PUBLIC_APP_URL;
