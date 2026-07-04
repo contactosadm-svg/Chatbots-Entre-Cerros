@@ -1043,7 +1043,6 @@ body.mode-client #adminApp{display:none!important}
                 <button class="btn btn-secondary btn-sm" id="btnExportGadgetKB"><span data-icon="export" data-icon-size="sm"></span> Exportar</button>
                 <button class="btn btn-secondary btn-sm" id="btnImportGadgetKB"><span data-icon="import" data-icon-size="sm"></span> Importar JSON</button>
                 <input type="file" id="gadgetKBImportFile" accept=".json" hidden>
-                <button class="btn btn-secondary btn-sm" id="btnResetGadgetKB"><span data-icon="undo" data-icon-size="sm"></span> Restaurar original</button>
                 <button class="btn btn-primary btn-sm" id="btnNewGadgetKB">+ Nuevo tema</button>
               </div>
             </div>
@@ -1564,7 +1563,7 @@ const ARTURITO_GADGET_CATEGORIES = {
     firestoreTtlType: 'Never',
     ticketEmailMode: 'extension'
   };
-  global.ARTURITO_FIREBASE_EMAIL_DEFAULTS = ARTURITO_FIREBASE_EMAIL_DEFAULTS;
+  globalThis.ARTURITO_FIREBASE_EMAIL_DEFAULTS = ARTURITO_FIREBASE_EMAIL_DEFAULTS;
 
   if (!global.__ARTURITO_FIREBASE_CONFIG__) {
     global.__ARTURITO_FIREBASE_CONFIG__ = DEFAULT_FIREBASE_CONFIG;
@@ -2963,7 +2962,7 @@ const ARTURITO_GADGET_CATEGORIES = {
         }
         return false;
       }
-      const defs = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
+      const defs = globalThis.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
       const patch = {};
       const pick = (key) => {
         const remoteVal = String(remote[key] ?? '').trim();
@@ -3009,7 +3008,7 @@ const ARTURITO_GADGET_CATEGORIES = {
 
     sanitizeSettingsForCloud(settings) {
       const s = settings || {};
-      const defs = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
+      const defs = globalThis.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
       const payload = {
         buildingName: s.buildingName || '',
         logo: s.logo || '',
@@ -4114,9 +4113,6 @@ const DatabaseModule = {
     }
     if (!database.manualKnowledge) database.manualKnowledge = [];
     if (!database.gadgetKB) database.gadgetKB = [];
-    if (!opts.skipGadgetSeed && !database.gadgetKB.length && typeof ARTURITO_GADGET_KB_SEED !== 'undefined') {
-      database.gadgetKB = JSON.parse(JSON.stringify(ARTURITO_GADGET_KB_SEED)).map(e => ({ ...e, createdAt: Date.now() }));
-    }
     if (!database.settings.gadgetCategories) {
       if (typeof ARTURITO_GADGET_CATEGORIES !== 'undefined') {
         database.settings.gadgetCategories = JSON.parse(JSON.stringify(ARTURITO_GADGET_CATEGORIES));
@@ -5441,14 +5437,6 @@ const GadgetKBModule = {
     const r = await DatabaseModule.save('gadgetKB', { gadget: { deletedIds: [id] } });
     void RAGModule.rebuildIndex();
     return r;
-  },
-
-  resetToSeed() {
-    if (typeof ARTURITO_GADGET_KB_SEED === 'undefined') return false;
-    database.gadgetKB = JSON.parse(JSON.stringify(ARTURITO_GADGET_KB_SEED)).map(e => ({ ...e, createdAt: Date.now() }));
-    DatabaseModule.save('gadgetKB', { gadget: { fullSync: true } });
-    KnowledgeBaseModule.syncFromGadget();
-    return true;
   },
 
   getByKey(key) {
@@ -9600,14 +9588,6 @@ const TrainingModule = {
       } catch { toast('Error al importar', 'error'); }
       e.target.value = '';
     });
-    document.getElementById('btnResetGadgetKB').addEventListener('click', async () => {
-      if (!confirm('¿Restaurar la base original del gadget? Se perderán las ediciones.')) return;
-      GadgetKBModule.resetToSeed();
-      await RAGModule.rebuildIndex();
-      this.renderGadgetKB(); this.renderManual(); this.renderStats();
-      if (document.body.classList.contains('mode-client') && ChatModule.getCurrent()) ChatModule.renderMessages();
-      toast('Base Gadget restaurada y sincronizada con base manual', 'success');
-    });
     this.renderGadgetCategories();
   },
   refreshCategorySelects(selectedKey) {
@@ -9949,7 +9929,7 @@ const TrainingModule = {
     const container = document.getElementById('gadgetKBGrouped');
     if (!container) return;
     if (!entries.length) {
-      container.innerHTML = `<div class="empty-state"><div class="icon">${icon('library','xl')}</div><p>Sin temas — use Restaurar original o cree uno nuevo</p></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="icon">${icon('library','xl')}</div><p>Sin temas — cree uno nuevo o importe un JSON sincronizado</p></div>`;
       return;
     }
     const groups = {};
