@@ -1221,8 +1221,9 @@ body.mode-client #adminApp{display:none!important}
             </div>
             <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" readonly required><p class="ticket-hint" style="margin:.35rem 0 0">Destinatario principal fijo para avisos de nuevo ticket.</p></div>
             <div class="form-group full"><label>Correo en copia (CC)</label><input type="email" id="setNotifyCcEmail" placeholder="opcional@entrecerros.cl"><p class="ticket-hint" style="margin:.35rem 0 0">Opcional. Este correo recibe copia del aviso de nuevo ticket, no reemplaza al administrador.</p></div>
-            <div class="form-group full"><label>Categorías de tickets</label><textarea id="setTicketCategories" rows="4" placeholder="Mantención&#10;Postventa&#10;Seguridad"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Una categoría por línea. Estas categorías alimentan el formulario de tickets, filtros, reportes y canalización de correos.</p></div>
-            <div class="form-group full"><label>Canalización por categoría</label><textarea id="setEmailRoutingRules" rows="6" placeholder="Mantención | mantencion@entrecerros.cl | supervisor@entrecerros.cl | mail_mantencion&#10;Reclamos, Emergencias | reclamos@entrecerros.cl |  | mail_reclamos"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Formato: <code>Categoría(s) | correo(s) destino | CC opcional | colección trigger</code>. Usa <code>*</code> para todas las categorías. La colección debe comenzar con <code>mail</code>.</p></div>
+            <div class="form-group full"><label>Categorías de tickets</label><textarea id="setTicketCategories" rows="4" placeholder="Mantención&#10;Postventa&#10;Seguridad"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Una categoría por línea. Estas categorías aparecen en el formulario, filtros, reportes y envío al Mayordomo.</p></div>
+            <div class="form-group full"><label>Correo Mayordomo (segundo trigger)</label><input type="email" id="setMayordomoEmail" placeholder="angelfrias1993@gmail.com"><p class="ticket-hint" style="margin:.35rem 0 0">Los tickets de las categorías seleccionadas se enviarán al trigger <code>Mayordomo</code>.</p></div>
+            <div class="form-group full"><label>Categorías que recibe Mayordomo</label><textarea id="setMayordomoCategories" rows="4" placeholder="Mantención&#10;Conserjería&#10;Emergencias"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Escribe una categoría por línea. Si queda vacío, no se envían tickets al segundo trigger.</p></div>
             <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"></div>
             <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en Firebase Trigger Email"></div>
@@ -2516,13 +2517,13 @@ const ARTURITO_GADGET_CATEGORIES = {
   const CLOUD_SETTINGS_KEYS = [
     'buildingName', 'logo', 'primaryColor', 'secondaryColor', 'botName',
     'welcomeMessage', 'portalTagline', 'portalHint', 'theme',
-    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'mayordomoEmail', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode',
     'quickQuestions', 'topicsMenuIntro', 'showTopicsOnWelcome',
     'chatShortcuts', 'chatMessages', 'gadgetCategories', 'gadgetCategoryOrder', 'chatAnalytics', 'updatedAt'
   ];
   const CLOUD_EMAIL_KEYS = [
-    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'mayordomoEmail', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode'
   ];
 
@@ -3050,6 +3051,7 @@ const ARTURITO_GADGET_CATEGORIES = {
         ticketCategories: Array.isArray(s.ticketCategories) && s.ticketCategories.length
           ? s.ticketCategories.map((c) => String(c || '').trim()).filter(Boolean)
           : DEFAULT_TICKET_CATEGORIES.slice(),
+        mayordomoEmail: s.mayordomoEmail || MAYORDOMO_EMAIL_DEFAULT,
         emailRouting: s.emailRouting && Array.isArray(s.emailRouting.routes)
           ? { enabled: s.emailRouting.enabled !== false, routes: s.emailRouting.routes.map((r) => ({ ...r })) }
           : { enabled: true, routes: [] },
@@ -3864,6 +3866,8 @@ const STORAGE_KEY = 'arturito_ai_database';
 const BACKUP_PREFIX = 'arturito_ai_backup_';
 const DEFAULT_TICKET_CATEGORIES = ['Mantención','Postventa','Seguridad','Conserjería','Mudanzas','Gastos Comunes','Reclamos','Emergencias'];
 const CATEGORIES = DEFAULT_TICKET_CATEGORIES;
+const MAYORDOMO_EMAIL_DEFAULT = 'angelfrias1993@gmail.com';
+const MAYORDOMO_COLLECTION = 'Mayordomo';
 const STATUSES = ['Abierto','En Revisión','Asignado','En Proceso','Resuelto','Cerrado'];
 const PRIORITIES = ['Baja','Media','Alta','Crítica'];
 const ROLES = ['SuperAdmin','Administrador','Supervisor','Operador','Conserje','Residente','Comité'];
@@ -3913,10 +3917,28 @@ function isValidEmailAddress(email) {
 }
 function normalizeMailCollectionName(raw) {
   const name = String(raw || 'mail').trim() || 'mail';
+  if (name === MAYORDOMO_COLLECTION) return name;
   if (!/^mail[a-z0-9_-]*$/i.test(name)) {
-    throw new Error('La colección del trigger debe comenzar con "mail" y usar solo letras, números, guion o guion bajo.');
+    throw new Error('La colección del trigger debe ser "Mayordomo" o comenzar con "mail".');
   }
   return name;
+}
+function getMayordomoRoute(settings = database.settings) {
+  return (settings?.emailRouting?.routes || []).find((route) =>
+    String(route.collection || '') === MAYORDOMO_COLLECTION
+  ) || null;
+}
+function buildMayordomoRouting(email, categories) {
+  const cleanEmail = String(email || '').trim();
+  const cleanCategories = [...new Set((categories || []).map((cat) => String(cat || '').trim()).filter(Boolean))];
+  if (!cleanEmail || !cleanCategories.length) return [];
+  return [{
+    id: 'mayordomo',
+    categories: cleanCategories,
+    to: [cleanEmail],
+    cc: [],
+    collection: MAYORDOMO_COLLECTION
+  }];
 }
 function parseEmailRoutingRules(raw, ticketCategories = getTicketCategories()) {
   const allowed = new Set(ticketCategories.map((c) => c.toLowerCase()));
@@ -4135,7 +4157,17 @@ const DatabaseModule = {
         notifyAdminEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
         notifyCcEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
         ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
-        emailRouting: { enabled: true, routes: [] },
+        mayordomoEmail: MAYORDOMO_EMAIL_DEFAULT,
+        emailRouting: {
+          enabled: true,
+          routes: [{
+            id: 'mayordomo',
+            categories: DEFAULT_TICKET_CATEGORIES.slice(),
+            to: [MAYORDOMO_EMAIL_DEFAULT],
+            cc: [],
+            collection: MAYORDOMO_COLLECTION
+          }]
+        },
         publicAppUrl: DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: DEFAULT_PUBLIC_APP_URL,
         smtpConnectionUri: '',
@@ -4161,7 +4193,17 @@ const DatabaseModule = {
       notifyAdminEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
       notifyCcEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
       ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
-      emailRouting: { enabled: true, routes: [] },
+      mayordomoEmail: MAYORDOMO_EMAIL_DEFAULT,
+      emailRouting: {
+        enabled: true,
+        routes: [{
+          id: 'mayordomo',
+          categories: DEFAULT_TICKET_CATEGORIES.slice(),
+          to: [MAYORDOMO_EMAIL_DEFAULT],
+          cc: [],
+          collection: MAYORDOMO_COLLECTION
+        }]
+      },
       publicAppUrl: DEFAULT_PUBLIC_APP_URL,
       adminPanelUrl:DEFAULT_PUBLIC_APP_URL,
       smtpConnectionUri:'',
@@ -5795,7 +5837,9 @@ const SettingsModule = {
     set('setNotifyAdminEmail', defs.notifyAdminEmail || 'conserjeria.wm815@gmail.com', 'value');
     set('setNotifyCcEmail', s.notifyCcEmail || '', 'value');
     set('setTicketCategories', getTicketCategories().join('\n'), 'value');
-    set('setEmailRoutingRules', formatEmailRoutingRules(s.emailRouting?.routes || []), 'value');
+    const mayordomoRoute = getMayordomoRoute(s);
+    set('setMayordomoEmail', mayordomoRoute?.to?.[0] || s.mayordomoEmail || MAYORDOMO_EMAIL_DEFAULT, 'value');
+    set('setMayordomoCategories', (mayordomoRoute?.categories || []).filter((cat) => cat !== '*').join('\n'), 'value');
     set('setPublicAppUrl', resolvePublicAppUrl(), 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL, 'value');
     set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
@@ -5868,15 +5912,26 @@ const SettingsModule = {
       return;
     }
     database.settings.ticketCategories = [...new Set(ticketCategories)];
-    try {
-      database.settings.emailRouting = {
-        enabled: true,
-        routes: parseEmailRoutingRules(document.getElementById('setEmailRoutingRules')?.value || '', database.settings.ticketCategories)
-      };
-    } catch (err) {
-      toast(err.message || 'Revisa la canalización por categoría', 'warning');
+    const mayordomoEmail = document.getElementById('setMayordomoEmail')?.value.trim() || MAYORDOMO_EMAIL_DEFAULT;
+    if (mayordomoEmail && !isValidEmailAddress(mayordomoEmail)) {
+      toast('Ingresa un correo válido para Mayordomo', 'warning');
       return;
     }
+    const allowedCategories = new Set(database.settings.ticketCategories.map((cat) => cat.toLowerCase()));
+    const mayordomoCategories = (document.getElementById('setMayordomoCategories')?.value || '')
+      .split(/\n+/)
+      .map((cat) => cat.trim())
+      .filter(Boolean);
+    const unknownMayordomo = mayordomoCategories.filter((cat) => !allowedCategories.has(cat.toLowerCase()));
+    if (unknownMayordomo.length) {
+      toast('Categoría Mayordomo no existe: ' + unknownMayordomo.join(', '), 'warning');
+      return;
+    }
+    database.settings.mayordomoEmail = mayordomoEmail;
+    database.settings.emailRouting = {
+      enabled: true,
+      routes: buildMayordomoRouting(mayordomoEmail, mayordomoCategories)
+    };
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || DEFAULT_PUBLIC_APP_URL;
     database.settings.publicAppUrl = resolvePublicAppUrl();
     const replyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || '';
