@@ -2003,21 +2003,33 @@ const ARTURITO_GADGET_CATEGORIES = {
       if (!this.fb.isEnabled()) {
         return global.DatabaseModule?.generateTicketId?.() || ('TK-' + Date.now());
       }
-      const { runTransaction } = this.fb._modules;
+      const { runTransaction, getDoc } = this.fb._modules;
       const { ds, prefix } = this._todayTicketPrefix();
       const counterRef = this.fb.doc(`condominios/${this.fb.getCondominioId()}/sync_meta/ticket_sequence`);
       try {
-        return await runTransaction(this.fb.db, async (transaction) => {
-          const snap = await transaction.get(counterRef);
-          let lastNumber = 0;
-          if (snap.exists()) {
-            const data = snap.data() || {};
-            if (data.date === ds) lastNumber = data.lastNumber || 0;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const candidate = await runTransaction(this.fb.db, async (transaction) => {
+            const snap = await transaction.get(counterRef);
+            let lastNumber = 0;
+            if (snap.exists()) {
+              const data = snap.data() || {};
+              if (data.date === ds) lastNumber = data.lastNumber || 0;
+            }
+            const next = lastNumber + 1;
+            transaction.set(counterRef, { date: ds, lastNumber: next, updatedAt: Date.now() });
+            return prefix + String(next).padStart(4, '0');
+          });
+          const [ticketSnap, mailSnap, clientMailSnap] = await Promise.all([
+            getDoc(this.fb.doc(`condominios/${this.fb.getCondominioId()}/tickets/${candidate}`)),
+            getDoc(this.fb._doc(`mail/${candidate}`)),
+            getDoc(this.fb._doc(`mail/${candidate}-client`))
+          ]);
+          if (!ticketSnap.exists() && !mailSnap.exists() && !clientMailSnap.exists()) {
+            return candidate;
           }
-          const next = lastNumber + 1;
-          transaction.set(counterRef, { date: ds, lastNumber: next, updatedAt: Date.now() });
-          return prefix + String(next).padStart(4, '0');
-        });
+          console.info('[Cloud] ID de ticket ya usado; avanzando correlativo:', candidate);
+        }
+        throw new Error('No se pudo reservar un número de ticket libre');
       } catch (err) {
         if (this.fb.isMissingDatabaseError?.(err)) {
           this.fb.markDatabaseUnavailable?.(err);
@@ -2029,9 +2041,9 @@ const ARTURITO_GADGET_CATEGORIES = {
       }
     }
 
-    /** Alinea contador con tickets ya guardados (requiere auth staff) */
+    /** Alinea contador con tickets ya guardados */
     async syncCounterFromExisting() {
-      if (!this.fb.isEnabled() || !this.fb.auth?.currentUser) return;
+      if (!this.fb.isEnabled()) return;
       const { getDocs, runTransaction } = this.fb._modules;
       const { ds, prefix } = this._todayTicketPrefix();
       let maxNum = 0;
@@ -2061,11 +2073,16 @@ const ARTURITO_GADGET_CATEGORIES = {
     }
 
     async create(ticket, files = []) {
-      const { setDoc, doc } = this.fb._modules;
+      const { getDoc, setDoc, doc } = this.fb._modules;
       const id = ticket.id || ticket.numeroTicket;
       const data = this.mapFromLocal(ticket);
       data.fechaCreacion = Date.now();
       data.fechaActualizacion = Date.now();
+      const ticketRef = doc(this.fb.col('tickets'), id);
+      const existingTicket = await getDoc(ticketRef);
+      if (existingTicket.exists()) {
+        throw new Error(`El ticket ${id} ya existe. Intenta nuevamente para generar un número nuevo.`);
+      }
 
       if (files.length) {
         data.adjuntos = [];
@@ -2081,7 +2098,7 @@ const ARTURITO_GADGET_CATEGORIES = {
         }
       }
 
-      await setDoc(doc(this.fb.col('tickets'), id), data);
+      await setDoc(ticketRef, data);
       const ticketPath = `condominios/${this.fb.getCondominioId()}/tickets/${id}`;
       const localTicket = this.mapToLocal(data, id);
       let mailId = null;
@@ -7682,8 +7699,13 @@ function resolvePublicAppUrl() {
   return DEFAULT_PUBLIC_APP_URL;
 }
 
+function buildPublicAppUrl(pathAndQuery = '') {
+  return `${DEFAULT_PUBLIC_APP_URL.replace(/\/+$/, '')}/${String(pathAndQuery).replace(/^\/+/, '')}`;
+}
+
 window.DEFAULT_PUBLIC_APP_URL = DEFAULT_PUBLIC_APP_URL;
 window.resolvePublicAppUrl = resolvePublicAppUrl;
+window.buildPublicAppUrl = buildPublicAppUrl;
 
 /* ─── TicketEmailDebug — diagnóstico en consola del envío de correos ─── */
 const TicketEmailDebug = {
@@ -8055,7 +8077,7 @@ const TicketEmailDebug = {
     return `${ticketId}-client`;
   },
   buildTicketStatusUrl(ticketId) {
-    return `${DEFAULT_PUBLIC_APP_URL}/?ticket=${encodeURIComponent(ticketId)}`;
+    return buildPublicAppUrl(`?ticket=${encodeURIComponent(ticketId)}`);
   },
   buildClientConfirmationPayload(ticketId, ticket, settings) {
     const s = settings || database.settings || {};
