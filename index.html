@@ -2092,8 +2092,8 @@ const ARTURITO_GADGET_CATEGORIES = {
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message));
         global.toast?.(
           denied
-            ? 'Ticket guardado. No se pudo preparar el correo de confirmación.'
-            : 'Ticket guardado, pero el correo de confirmación quedó pendiente.',
+            ? 'Ticket guardado. No se pudo preparar el correo al administrador.'
+            : 'Ticket guardado, pero el correo al administrador quedó pendiente.',
           'warning'
         );
       }
@@ -8308,11 +8308,19 @@ const TicketEmailDebug = {
     return { ok: false, timeout: true };
   },
   async afterTicketCreated(ticketId, ticket) {
-    this.log('✓ Ticket creado — mail/' + ticketId, { ticketId, mailPath: `mail/${ticketId}`, database: 'chatbotentrecerros' });
+    this.log('✓ Ticket creado — preparando mail/' + ticketId, { ticketId, mailPath: `mail/${ticketId}`, database: 'chatbotentrecerros' });
     toast('Ticket creado correctamente.', 'success');
     const clientEmail = this._parseEmails(ticket?.email)[0];
     if (clientEmail) {
       toast(`Enviando confirmación a ${clientEmail}…`, 'info');
+    }
+    try {
+      await this.queueMailForTicket(ticketId, ticket);
+    } catch (err) {
+      this.warn('No se pudo crear mail/' + ticketId, err?.message || err);
+      toast('Ticket creado, pero no se pudo encolar el correo al administrador.', 'warning');
+      await this.audit('Post-creación ticket sin correo admin');
+      return { ok: false, error: err?.message || String(err) };
     }
     const [adminResult] = await Promise.all([
       this.watchMailDelivery(ticketId, 15, false),
@@ -10832,7 +10840,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v32-db-chatbotentrecerros';",
+    "const CACHE_NAME='arturito-ai-v35-ticket-mail-retry';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
