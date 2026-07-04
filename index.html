@@ -132,13 +132,14 @@ textarea{resize:vertical;min-height:80px}
 .category-add-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.85rem}
 .category-add-row input{flex:1}
 .category-list{display:flex;flex-direction:column;gap:.5rem}
-.category-item{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.6rem;align-items:center;padding:.7rem .75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)}
+.category-item{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:.6rem;align-items:center;padding:.7rem .75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)}
 .category-name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.category-mayordomo{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap}
-.category-mayordomo input{width:auto}
+.category-check{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap}
+.category-check input{width:auto}
+.category-check.admin-excluded{color:var(--danger)}
 .admin-simple-note{font-size:.78rem;color:var(--text-muted);line-height:1.45;margin-top:.55rem}
 .admin-technical{display:none!important}
-@media(max-width:900px){.admin-settings-grid{grid-template-columns:1fr}.category-item{grid-template-columns:1fr}.category-mayordomo{justify-content:flex-start}}
+@media(max-width:900px){.admin-settings-grid{grid-template-columns:1fr}.category-item{grid-template-columns:1fr}.category-check{justify-content:flex-start}}
 
 /* Tables */
 .table-wrap{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border)}
@@ -149,7 +150,7 @@ th:hover{color:var(--primary)}
 tr:hover td{background:color-mix(in srgb,var(--primary) 4%,transparent)}
 .badge{display:inline-block;padding:.2rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.02em}
 .badge-open{background:#dbeafe;color:#1d4ed8}.badge-review{background:#fef3c7;color:#b45309}.badge-assigned{background:#e0e7ff;color:#4338ca}
-.badge-process{background:#fce7f3;color:#be185d}.badge-resolved{background:#d1fae5;color:#047857}.badge-closed{background:#f1f5f9;color:#475569}
+.badge-process{background:#fce7f3;color:#be185d}.badge-resolved{background:#d1fae5;color:#047857}.badge-closed{background:#f1f5f9;color:#475569}.badge-cancelled{background:#fee2e2;color:#991b1b}
 .badge-low{background:#ecfdf5;color:#059669}.badge-medium{background:#fef9c3;color:#ca8a04}.badge-high{background:#fee2e2;color:#dc2626}.badge-critical{background:#450a0a;color:#fff}
 .badge-info{background:#e0f2fe;color:#0369a1;text-transform:none}.badge-secondary{background:#f1f5f9;color:#475569;text-transform:none}
 .toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center}
@@ -964,6 +965,7 @@ body.mode-client #adminApp{display:none!important}
     <nav class="nav" id="mainNav">
       <button class="nav-item active" data-view="admin"><span class="icon" data-icon="dashboard"></span> Dashboard</button>
       <button class="nav-item" data-view="tickets"><span class="icon" data-icon="tickets"></span> Tickets</button>
+      <button class="nav-item" data-view="cancelledTickets"><span class="icon" data-icon="trash"></span> Tickets anulados</button>
       <button class="nav-item" data-view="knowledge"><span class="icon" data-icon="brain"></span> Entrenamiento IA</button>
       <button class="nav-item" data-view="users"><span class="icon" data-icon="users"></span> Usuarios</button>
       <button class="nav-item" data-view="reports"><span class="icon" data-icon="reports"></span> Reportes</button>
@@ -1014,6 +1016,22 @@ body.mode-client #adminApp{display:none!important}
             <th data-sort="categoria">Categoría</th><th data-sort="prioridad">Prioridad</th><th data-sort="estado">Estado</th>
             <th>Correo</th><th data-sort="createdAt">Fecha</th><th>Acciones</th>
           </tr></thead><tbody id="ticketsBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- TICKETS ANULADOS VIEW -->
+      <section class="view" id="view-cancelledTickets">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Tickets anulados</span>
+            <button class="btn btn-danger btn-sm" id="btnClearCancelledTickets"><span data-icon="trash" data-icon-size="sm"></span> Limpiar anulados</button>
+          </div>
+          <div class="toolbar">
+            <div class="search-box"><input type="text" id="cancelledTicketSearch" placeholder="Buscar tickets anulados..."></div>
+          </div>
+          <div class="table-wrap"><table id="cancelledTicketsTable"><thead><tr>
+            <th>ID</th><th>Residente</th><th>Depto</th><th>Categoría</th><th>Prioridad</th><th>Fecha anulación</th><th>Motivo</th><th>Acciones</th>
+          </tr></thead><tbody id="cancelledTicketsBody"></tbody></table></div>
         </div>
       </section>
 
@@ -1236,9 +1254,10 @@ body.mode-client #adminApp{display:none!important}
             <div class="admin-settings-grid">
               <div class="settings-panel">
                 <div class="settings-panel-title">Categorías de tickets</div>
-                <p class="settings-panel-subtitle">Agrega o elimina categorías del formulario. Marca cuáles debe recibir el Mayordomo.</p>
+                <p class="settings-panel-subtitle">Agrega o elimina categorías del formulario. Marca Mayordomo o No admin según corresponda.</p>
                 <input type="hidden" id="setTicketCategories">
                 <input type="hidden" id="setMayordomoCategories">
+                <input type="hidden" id="setAdminExcludedCategories">
                 <div class="category-add-row">
                   <input type="text" id="newTicketCategoryName" placeholder="Nueva categoría, ej. Ascensores">
                   <button type="button" class="btn btn-secondary btn-sm" id="btnAddTicketCategory">Agregar</button>
@@ -1247,7 +1266,7 @@ body.mode-client #adminApp{display:none!important}
               </div>
               <div class="settings-panel">
                 <div class="settings-panel-title">Correos de avisos</div>
-                <p class="settings-panel-subtitle">El administrador recibe todos los tickets. El Mayordomo recibe solo las categorías marcadas.</p>
+                <p class="settings-panel-subtitle">El administrador recibe todos los tickets, excepto las categorías marcadas como No admin.</p>
                 <div class="form-group"><label>Administrador principal</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" readonly required></div>
                 <div class="form-group"><label>Correo en copia (opcional)</label><input type="email" id="setNotifyCcEmail" placeholder="opcional@entrecerros.cl"></div>
                 <div class="form-group"><label>Correo Mayordomo</label><input type="email" id="setMayordomoEmail" placeholder="angelfrias1993@gmail.com"></div>
@@ -1994,7 +2013,11 @@ const ARTURITO_GADGET_CATEGORIES = {
         fechaActualizacion: t.updatedAt || Date.now(),
         creadoPor: t.creadoPor || t.email,
         asignadoA: t.asignadoA || null,
-        adjuntos: (t.attachments || []).map((a) => this.normalizeAttachment(a)).filter(Boolean)
+        adjuntos: (t.attachments || []).map((a) => this.normalizeAttachment(a)).filter(Boolean),
+        anulado: t.anulado === true,
+        fechaAnulacion: t.fechaAnulacion || null,
+        motivoAnulacion: t.motivoAnulacion || '',
+        anuladoPor: t.anuladoPor || ''
       };
     }
 
@@ -2015,7 +2038,11 @@ const ARTURITO_GADGET_CATEGORIES = {
         creadoPor: d.creadoPor,
         ultimaRespuesta: d.ultimaRespuesta || '',
         ultimaRespuestaAt: d.ultimaRespuestaAt || null,
-        historialResidente: Array.isArray(d.historialResidente) ? d.historialResidente : []
+        historialResidente: Array.isArray(d.historialResidente) ? d.historialResidente : [],
+        anulado: d.anulado === true || d.estado === 'Anulado',
+        fechaAnulacion: d.fechaAnulacion || null,
+        motivoAnulacion: d.motivoAnulacion || '',
+        anuladoPor: d.anuladoPor || ''
       };
     }
 
@@ -2214,6 +2241,32 @@ const ARTURITO_GADGET_CATEGORIES = {
       } catch (err) {
         console.warn('[Cloud] delete ticket responses:', err);
       }
+      await deleteDoc(doc(this.fb.col('tickets'), id));
+    }
+
+    async annul(id, { motivo = '', usuario = '' } = {}) {
+      return this.update(id, {
+        estado: 'Anulado',
+        anulado: true,
+        fechaAnulacion: Date.now(),
+        motivoAnulacion: motivo,
+        anuladoPor: usuario
+      });
+    }
+
+    async restore(id) {
+      return this.update(id, {
+        estado: 'Abierto',
+        anulado: false,
+        fechaAnulacion: null,
+        motivoAnulacion: '',
+        anuladoPor: ''
+      });
+    }
+
+    async purgeAnnulled(id) {
+      if (!id) return;
+      const { deleteDoc, doc } = this.fb._modules;
       await deleteDoc(doc(this.fb.col('tickets'), id));
     }
 
@@ -2483,7 +2536,7 @@ const ARTURITO_GADGET_CATEGORIES = {
     }
 
     static computeMetrics(database, chatSessions = []) {
-      const t = database.tickets || [];
+      const t = (database.tickets || []).filter((ticket) => !(ticket?.anulado === true || ticket?.estado === 'Anulado'));
       const openStates = ['Abierto', 'En Revisión', 'Asignado', 'En Proceso'];
       const closedStates = ['Resuelto', 'Cerrado'];
       const open = t.filter((x) => openStates.includes(x.estado));
@@ -2547,13 +2600,13 @@ const ARTURITO_GADGET_CATEGORIES = {
   const CLOUD_SETTINGS_KEYS = [
     'buildingName', 'logo', 'primaryColor', 'secondaryColor', 'botName',
     'welcomeMessage', 'portalTagline', 'portalHint', 'theme',
-    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'mayordomoEmail', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'adminExcludedCategories', 'mayordomoEmail', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode',
     'quickQuestions', 'topicsMenuIntro', 'showTopicsOnWelcome',
     'chatShortcuts', 'chatMessages', 'gadgetCategories', 'gadgetCategoryOrder', 'chatAnalytics', 'updatedAt'
   ];
   const CLOUD_EMAIL_KEYS = [
-    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'mayordomoEmail', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'adminExcludedCategories', 'mayordomoEmail', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode'
   ];
 
@@ -3081,6 +3134,9 @@ const ARTURITO_GADGET_CATEGORIES = {
         ticketCategories: Array.isArray(s.ticketCategories) && s.ticketCategories.length
           ? s.ticketCategories.map((c) => String(c || '').trim()).filter(Boolean)
           : DEFAULT_TICKET_CATEGORIES.slice(),
+        adminExcludedCategories: Array.isArray(s.adminExcludedCategories)
+          ? s.adminExcludedCategories.map((c) => String(c || '').trim()).filter(Boolean)
+          : [],
         mayordomoEmail: s.mayordomoEmail || MAYORDOMO_EMAIL_DEFAULT,
         emailRouting: s.emailRouting && Array.isArray(s.emailRouting.routes)
           ? { enabled: s.emailRouting.enabled !== false, routes: s.emailRouting.routes.map((r) => ({ ...r })) }
@@ -3926,6 +3982,9 @@ const DEFAULT_TOPICS_MENU_INTRO = 'Aquí tienes todos los temas sobre los que pu
 function getTopicsMenuIntro() {
   return database.settings?.topicsMenuIntro?.trim() || DEFAULT_TOPICS_MENU_INTRO;
 }
+function isTicketAnnulled(ticket) {
+  return ticket?.anulado === true || ticket?.estado === 'Anulado';
+}
 function showTopicsOnWelcome() {
   return database.settings?.showTopicsOnWelcome !== false;
 }
@@ -4187,6 +4246,7 @@ const DatabaseModule = {
         notifyAdminEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
         notifyCcEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
         ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
+        adminExcludedCategories: [],
         mayordomoEmail: MAYORDOMO_EMAIL_DEFAULT,
         emailRouting: {
           enabled: true,
@@ -4223,6 +4283,7 @@ const DatabaseModule = {
       notifyAdminEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
       notifyCcEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
       ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
+      adminExcludedCategories: [],
       mayordomoEmail: MAYORDOMO_EMAIL_DEFAULT,
       emailRouting: {
         enabled: true,
@@ -4349,7 +4410,7 @@ function fmtDate(ts) {
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 function badgeStatus(s) {
-  const m = {'Abierto':'open','En Revisión':'review','Asignado':'assigned','En Proceso':'process','Resuelto':'resolved','Cerrado':'closed'};
+  const m = {'Abierto':'open','En Revisión':'review','Asignado':'assigned','En Proceso':'process','Resuelto':'resolved','Cerrado':'closed','Anulado':'cancelled'};
   return `<span class="badge badge-${m[s]||'closed'}">${s}</span>`;
 }
 function badgePriority(p) {
@@ -5870,6 +5931,7 @@ const SettingsModule = {
     const mayordomoRoute = getMayordomoRoute(s);
     set('setMayordomoEmail', mayordomoRoute?.to?.[0] || s.mayordomoEmail || MAYORDOMO_EMAIL_DEFAULT, 'value');
     set('setMayordomoCategories', (mayordomoRoute?.categories || []).filter((cat) => cat !== '*').join('\n'), 'value');
+    set('setAdminExcludedCategories', (s.adminExcludedCategories || []).join('\n'), 'value');
     this.renderTicketCategoryManager();
     set('setPublicAppUrl', resolvePublicAppUrl(), 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL, 'value');
@@ -5907,31 +5969,43 @@ const SettingsModule = {
     const hidden = document.getElementById('setMayordomoCategories');
     return [...new Set(String(hidden?.value || '').split(/\n+/).map((cat) => cat.trim()).filter(Boolean))];
   },
-  syncCategoryHiddenFields(categories, mayordomoCategories) {
+  getFormAdminExcludedCategories() {
+    const hidden = document.getElementById('setAdminExcludedCategories');
+    return [...new Set(String(hidden?.value || '').split(/\n+/).map((cat) => cat.trim()).filter(Boolean))];
+  },
+  syncCategoryHiddenFields(categories, mayordomoCategories, adminExcludedCategories = this.getFormAdminExcludedCategories()) {
     const cleanCategories = [...new Set((categories || []).map((cat) => String(cat || '').trim()).filter(Boolean))];
     const allowed = new Set(cleanCategories.map((cat) => cat.toLowerCase()));
     const cleanMayordomo = [...new Set((mayordomoCategories || []).map((cat) => String(cat || '').trim()).filter(Boolean))]
       .filter((cat) => allowed.has(cat.toLowerCase()));
+    const cleanAdminExcluded = [...new Set((adminExcludedCategories || []).map((cat) => String(cat || '').trim()).filter(Boolean))]
+      .filter((cat) => allowed.has(cat.toLowerCase()));
     const catsEl = document.getElementById('setTicketCategories');
     const mayEl = document.getElementById('setMayordomoCategories');
+    const adminEl = document.getElementById('setAdminExcludedCategories');
     if (catsEl) catsEl.value = cleanCategories.join('\n');
     if (mayEl) mayEl.value = cleanMayordomo.join('\n');
-    return { categories: cleanCategories, mayordomoCategories: cleanMayordomo };
+    if (adminEl) adminEl.value = cleanAdminExcluded.join('\n');
+    return { categories: cleanCategories, mayordomoCategories: cleanMayordomo, adminExcludedCategories: cleanAdminExcluded };
   },
   renderTicketCategoryManager() {
     const container = document.getElementById('ticketCategoryManager');
     if (!container) return;
-    const { categories, mayordomoCategories } = this.syncCategoryHiddenFields(
+    const { categories, mayordomoCategories, adminExcludedCategories } = this.syncCategoryHiddenFields(
       this.getFormCategories(),
-      this.getFormMayordomoCategories()
+      this.getFormMayordomoCategories(),
+      this.getFormAdminExcludedCategories()
     );
     const mayordomoSet = new Set(mayordomoCategories.map((cat) => cat.toLowerCase()));
+    const adminExcludedSet = new Set(adminExcludedCategories.map((cat) => cat.toLowerCase()));
     container.innerHTML = categories.length ? categories.map((cat) => {
-      const checked = mayordomoSet.has(cat.toLowerCase()) ? 'checked' : '';
+      const mayordomoChecked = mayordomoSet.has(cat.toLowerCase()) ? 'checked' : '';
+      const adminExcludedChecked = adminExcludedSet.has(cat.toLowerCase()) ? 'checked' : '';
       const disabled = categories.length <= 1 ? 'disabled' : '';
       return `<div class="category-item" data-category="${escapeHtml(cat)}">
         <div class="category-name">${escapeHtml(cat)}</div>
-        <label class="category-mayordomo"><input type="checkbox" data-mayordomo-category="${escapeHtml(cat)}" ${checked}> Mayordomo</label>
+        <label class="category-check"><input type="checkbox" data-mayordomo-category="${escapeHtml(cat)}" ${mayordomoChecked}> Mayordomo</label>
+        <label class="category-check admin-excluded"><input type="checkbox" data-admin-excluded-category="${escapeHtml(cat)}" ${adminExcludedChecked}> No admin</label>
         <button type="button" class="btn btn-danger btn-sm" data-remove-ticket-category="${escapeHtml(cat)}" ${disabled}>Eliminar</button>
       </div>`;
     }).join('') : '<div class="empty-state">Agrega al menos una categoría</div>';
@@ -5949,7 +6023,7 @@ const SettingsModule = {
       return;
     }
     categories.push(name);
-    this.syncCategoryHiddenFields(categories, this.getFormMayordomoCategories());
+    this.syncCategoryHiddenFields(categories, this.getFormMayordomoCategories(), this.getFormAdminExcludedCategories());
     if (input) input.value = '';
     this.renderTicketCategoryManager();
   },
@@ -5961,7 +6035,8 @@ const SettingsModule = {
     }
     const nextCategories = categories.filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
     const nextMayordomo = this.getFormMayordomoCategories().filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
-    this.syncCategoryHiddenFields(nextCategories, nextMayordomo);
+    const nextAdminExcluded = this.getFormAdminExcludedCategories().filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
+    this.syncCategoryHiddenFields(nextCategories, nextMayordomo, nextAdminExcluded);
     this.renderTicketCategoryManager();
   },
   toggleMayordomoCategory(name, enabled) {
@@ -5970,7 +6045,16 @@ const SettingsModule = {
     const next = enabled && !exists
       ? [...current, name]
       : current.filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
-    this.syncCategoryHiddenFields(this.getFormCategories(), next);
+    this.syncCategoryHiddenFields(this.getFormCategories(), next, this.getFormAdminExcludedCategories());
+    this.renderTicketCategoryManager();
+  },
+  toggleAdminExcludedCategory(name, enabled) {
+    const current = this.getFormAdminExcludedCategories();
+    const exists = current.some((cat) => cat.toLowerCase() === String(name).toLowerCase());
+    const next = enabled && !exists
+      ? [...current, name]
+      : current.filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
+    this.syncCategoryHiddenFields(this.getFormCategories(), this.getFormMayordomoCategories(), next);
     this.renderTicketCategoryManager();
   },
   /** Vista previa del portal principal */
@@ -6033,6 +6117,16 @@ const SettingsModule = {
       toast('Categoría Mayordomo no existe: ' + unknownMayordomo.join(', '), 'warning');
       return;
     }
+    const adminExcludedCategories = (document.getElementById('setAdminExcludedCategories')?.value || '')
+      .split(/\n+/)
+      .map((cat) => cat.trim())
+      .filter(Boolean);
+    const unknownAdminExcluded = adminExcludedCategories.filter((cat) => !allowedCategories.has(cat.toLowerCase()));
+    if (unknownAdminExcluded.length) {
+      toast('Categoría No admin no existe: ' + unknownAdminExcluded.join(', '), 'warning');
+      return;
+    }
+    database.settings.adminExcludedCategories = [...new Set(adminExcludedCategories)];
     database.settings.mayordomoEmail = mayordomoEmail;
     database.settings.emailRouting = {
       enabled: true,
@@ -6097,6 +6191,11 @@ const SettingsModule = {
       const check = e.target.closest('[data-mayordomo-category]');
       if (check) {
         this.toggleMayordomoCategory(check.dataset.mayordomoCategory, check.checked);
+        return;
+      }
+      const adminCheck = e.target.closest('[data-admin-excluded-category]');
+      if (adminCheck) {
+        this.toggleAdminExcludedCategory(adminCheck.dataset.adminExcludedCategory, adminCheck.checked);
       }
     });
     const tt = document.getElementById('themeToggle');
@@ -8531,6 +8630,10 @@ const TicketEmailDebug = {
       return cats.includes('*') || cats.some((cat) => String(cat || '').trim().toLowerCase() === current);
     });
   },
+  isAdminExcludedCategory(settings, category) {
+    const current = String(category || '').trim().toLowerCase();
+    return (settings?.adminExcludedCategories || []).some((cat) => String(cat || '').trim().toLowerCase() === current);
+  },
   async queueCategoryRouteMails(ticketId, ticket, settings, email, replyTo) {
     const routes = this.getCategoryEmailRoutes(settings, ticket.categoria || ticket.asunto);
     if (!routes.length) return [];
@@ -8593,6 +8696,13 @@ const TicketEmailDebug = {
     const email = this.buildTicketEmailPayload(ticketId, ticket, settings);
     const replyTo = ticket.email || settings?.smtpReplyTo || to[0];
     const { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
+    const adminExcluded = this.isAdminExcludedCategory(settings, ticket.categoria || ticket.asunto);
+    if (adminExcluded) {
+      this.log('Correo admin omitido por categoría', { ticketId, category: ticket.categoria || ticket.asunto });
+      await this.queueCategoryRouteMails(ticketId, ticket, settings, email, replyTo);
+      void this.queueClientConfirmationMail(ticketId, ticket, settings);
+      return ticketId;
+    }
     const mailRef = doc(ArturitoCloud.fb.db, 'mail', ticketId);
     const existing = getDocFromServer ? await getDocFromServer(mailRef) : await getDoc(mailRef);
     if (existing.exists()) {
@@ -8738,8 +8848,9 @@ const TicketEmailDebug = {
       await this.audit('Post-creación ticket sin correo admin');
       return { ok: false, error: err?.message || String(err) };
     }
+    const adminExcluded = this.isAdminExcludedCategory(database.settings || {}, ticket?.categoria || ticket?.asunto);
     const [adminResult] = await Promise.all([
-      this.watchMailDelivery(ticketId, 15, false),
+      adminExcluded ? Promise.resolve({ ok: true, skippedAdmin: true }) : this.watchMailDelivery(ticketId, 15, false),
       this.watchMailDelivery(this.clientMailId(ticketId), 15, false)
     ]);
     if (clientEmail) {
@@ -9501,6 +9612,7 @@ const TicketModule = {
   init() {
     this.populateSelects();
     document.getElementById('btnNewTicket').addEventListener('click', () => this.openCreate());
+    document.getElementById('btnClearCancelledTickets')?.addEventListener('click', () => CancelledTicketModule.clearAll());
     document.getElementById('ticketForm').addEventListener('submit', e => this.save(e));
     document.getElementById('btnTicketAttach').addEventListener('click', () => document.getElementById('ticketFileInput').click());
     document.getElementById('ticketFileInput').addEventListener('change', e => {
@@ -9538,6 +9650,7 @@ const TicketModule = {
       }
     });
     document.getElementById('ticketSearch').addEventListener('input', () => this.render());
+    document.getElementById('cancelledTicketSearch')?.addEventListener('input', () => CancelledTicketModule.render());
     document.getElementById('ticketFilterCat').addEventListener('change', () => this.render());
     document.getElementById('ticketFilterStatus').addEventListener('change', () => this.render());
     document.getElementById('ticketFilterPriority').addEventListener('change', () => this.render());
@@ -9564,12 +9677,14 @@ const TicketModule = {
     document.getElementById('tEstado').innerHTML = STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
   },
   /** Filtra tickets según criterios */
-  getFiltered(searchId, catId, statusId, priId) {
+  getFiltered(searchId, catId, statusId, priId, options = {}) {
     const q = (document.getElementById(searchId)?.value || '').toLowerCase();
     const cat = document.getElementById(catId)?.value || '';
     const st = document.getElementById(statusId)?.value || '';
     const pr = document.getElementById(priId)?.value || '';
     return database.tickets.filter(t => {
+      if (options.onlyAnnulled && !isTicketAnnulled(t)) return false;
+      if (!options.onlyAnnulled && options.includeAnnulled !== true && isTicketAnnulled(t)) return false;
       if (cat && t.categoria !== cat) return false;
       if (st && t.estado !== st) return false;
       if (pr && t.prioridad !== pr) return false;
@@ -9594,7 +9709,7 @@ const TicketModule = {
       <td>${t.categoria}</td><td>${badgePriority(t.prioridad)}</td><td>${badgeStatus(t.estado)}</td>
       <td>${TicketEmailDebug.mailBadgeHtml(t.id)}</td>
       <td>${fmtDate(t.createdAt)}</td>
-      <td>${actionBtn('eye', `TicketManageModule.open('${t.id}')`, 'Gestionar')}${actionBtn('edit', `TicketModule.openEdit('${t.id}')`, 'Editar')}${actionBtn('trash', `TicketModule.remove('${t.id}')`, 'Eliminar', true)}</td>
+      <td>${actionBtn('eye', `TicketManageModule.open('${t.id}')`, 'Gestionar')}${actionBtn('edit', `TicketModule.openEdit('${t.id}')`, 'Editar')}${actionBtn('trash', `TicketModule.remove('${t.id}')`, 'Anular ticket', true)}</td>
     </tr>`;
     }).join('') : '<tr><td colspan="9"><div class="empty-state">No hay tickets</div></td></tr>';
   },
@@ -9837,33 +9952,44 @@ const TicketModule = {
       if (submitBtn) submitBtn.disabled = false;
     }
   },
-  /** Elimina ticket (Firestore primero; requiere sesión Firebase Auth) */
+  /** Anula ticket sin borrarlo de Firestore */
   async remove(id) {
-    if (!confirm('¿Eliminar ticket ' + id + '?')) return;
+    if (!confirm('¿Anular ticket ' + id + '? Se moverá a Tickets anulados.')) return;
+    const motivo = (prompt('Motivo de anulación (opcional):', '') || '').trim();
     try {
-      await TicketAttachmentModule.deleteByTicket(id);
       if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled()) {
-        if (!ArturitoCloud.fb.auth?.currentUser) {
-          toast('Inicia sesión con Firebase Auth para eliminar tickets de forma permanente.', 'warning');
-          return;
-        }
-        await ArturitoCloud.tickets.delete(id);
+        await ArturitoCloud.tickets.annul(id, {
+          motivo,
+          usuario: AuthModule.currentUser?.email || AuthModule.currentUser?.nombre || 'admin'
+        });
       }
-      database.tickets = database.tickets.filter(t => t.id !== id);
+      const idx = database.tickets.findIndex(t => t.id === id);
+      if (idx >= 0) {
+        database.tickets[idx] = {
+          ...database.tickets[idx],
+          estado: 'Anulado',
+          anulado: true,
+          fechaAnulacion: Date.now(),
+          motivoAnulacion: motivo,
+          anuladoPor: AuthModule.currentUser?.email || AuthModule.currentUser?.nombre || 'admin',
+          updatedAt: Date.now()
+        };
+      }
       DatabaseModule.save();
       this.render();
       AdminModule.render();
+      CancelledTicketModule.render();
       ReportModule.render();
-      toast('Ticket eliminado de la nube', 'success');
+      toast('Ticket anulado y movido a Tickets anulados', 'success');
     } catch (err) {
-      console.warn('[Ticket] delete:', err);
-      toast('No se pudo eliminar el ticket. Verifica permisos Firebase Auth.', 'error');
+      console.warn('[Ticket] annul:', err);
+      toast('No se pudo anular el ticket. Verifica reglas de Firestore.', 'error');
     }
   },
   /** Exporta tickets a CSV (Excel) */
   exportExcel() {
     const headers = ['ID','Nombre','Departamento','Email','Categoría','Prioridad','Estado','Descripción','Adjuntos','Fecha'];
-    const rows = database.tickets.map(t => [t.id,t.nombre,t.departamento,t.email,t.categoria,t.prioridad,t.estado,t.descripcion,(t.attachments||[]).map(a=>TicketAttachmentModule.attachmentLabel(a)).join('; ')||'—',fmtDate(t.createdAt)]);
+    const rows = database.tickets.filter((t) => !isTicketAnnulled(t)).map(t => [t.id,t.nombre,t.departamento,t.email,t.categoria,t.prioridad,t.estado,t.descripcion,(t.attachments||[]).map(a=>TicketAttachmentModule.attachmentLabel(a)).join('; ')||'—',fmtDate(t.createdAt)]);
     const csv = [headers,...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob(['\ufeff'+csv], { type:'text/csv;charset=utf-8' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tickets_arturito.csv'; a.click();
@@ -9872,13 +9998,99 @@ const TicketModule = {
   /** Exporta tickets a PDF via impresión */
   exportPDF() {
     const w = window.open('', '_blank');
-    const rows = database.tickets.map(t => `<tr><td>${t.id}</td><td>${t.nombre}</td><td>${t.departamento}</td><td>${t.categoria}</td><td>${t.prioridad}</td><td>${t.estado}</td><td>${fmtDate(t.createdAt)}</td></tr>`).join('');
+    const rows = database.tickets.filter((t) => !isTicketAnnulled(t)).map(t => `<tr><td>${t.id}</td><td>${t.nombre}</td><td>${t.departamento}</td><td>${t.categoria}</td><td>${t.prioridad}</td><td>${t.estado}</td><td>${fmtDate(t.createdAt)}</td></tr>`).join('');
     w.document.write(`<!DOCTYPE html><html><head><title>Tickets ARTURITO AI</title><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Nunito',sans-serif;padding:20px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px}th{background:#0d9488;color:#fff}</style></head><body>
       <h1>Reporte de Tickets — ${database.settings.buildingName}</h1><p>Generado: ${new Date().toLocaleString('es-CL')}</p>
       <table><thead><tr><th>ID</th><th>Nombre</th><th>Depto</th><th>Categoría</th><th>Prioridad</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${rows}</tbody></table>
     </body></html>`);
     w.document.close(); w.print();
     toast('PDF listo para imprimir/guardar', 'success');
+  }
+};
+
+/* ─── CancelledTicketModule ─── */
+const CancelledTicketModule = {
+  getFiltered() {
+    const q = (document.getElementById('cancelledTicketSearch')?.value || '').toLowerCase();
+    return (database.tickets || [])
+      .filter(isTicketAnnulled)
+      .filter((t) => !q || Object.values(t).some((v) => String(v || '').toLowerCase().includes(q)))
+      .sort((a, b) => (b.fechaAnulacion || b.updatedAt || 0) - (a.fechaAnulacion || a.updatedAt || 0));
+  },
+  render() {
+    const tbody = document.getElementById('cancelledTicketsBody');
+    if (!tbody) return;
+    const tickets = this.getFiltered();
+    tbody.innerHTML = tickets.length ? tickets.map((t) => `<tr>
+      <td><strong>${escapeHtml(t.id)}</strong></td>
+      <td>${escapeHtml(t.nombre || '')}</td>
+      <td>${escapeHtml(t.departamento || '')}</td>
+      <td>${escapeHtml(t.categoria || '')}</td>
+      <td>${badgePriority(t.prioridad)}</td>
+      <td>${fmtDate(t.fechaAnulacion || t.updatedAt)}</td>
+      <td>${escapeHtml(t.motivoAnulacion || 'Sin motivo')}</td>
+      <td>${actionBtn('eye', `TicketManageModule.open('${t.id}')`, 'Ver')}${actionBtn('undo', `CancelledTicketModule.restore('${t.id}')`, 'Reactivar')}</td>
+    </tr>`).join('') : '<tr><td colspan="8"><div class="empty-state">No hay tickets anulados</div></td></tr>';
+  },
+  async restore(id) {
+    if (!confirm('¿Reactivar ticket ' + id + '? Volverá al listado de tickets activos.')) return;
+    try {
+      if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled()) {
+        await ArturitoCloud.tickets.restore(id);
+      }
+      const idx = database.tickets.findIndex((t) => t.id === id);
+      if (idx >= 0) {
+        database.tickets[idx] = {
+          ...database.tickets[idx],
+          estado: 'Abierto',
+          anulado: false,
+          fechaAnulacion: null,
+          motivoAnulacion: '',
+          anuladoPor: '',
+          updatedAt: Date.now()
+        };
+      }
+      DatabaseModule.save();
+      TicketModule.render();
+      AdminModule.render();
+      this.render();
+      ReportModule.render();
+      toast('Ticket reactivado', 'success');
+    } catch (err) {
+      console.warn('[Ticket] restore:', err);
+      toast('No se pudo reactivar el ticket', 'error');
+    }
+  },
+  async clearAll() {
+    const tickets = (database.tickets || []).filter(isTicketAnnulled);
+    if (!tickets.length) {
+      toast('No hay tickets anulados para limpiar', 'info');
+      return;
+    }
+    if (!confirm(`¿Eliminar definitivamente ${tickets.length} ticket(s) anulados? Esta acción no se puede deshacer.`)) return;
+    const failed = [];
+    for (const ticket of tickets) {
+      try {
+        if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled()) {
+          await ArturitoCloud.tickets.purgeAnnulled(ticket.id);
+        }
+      } catch (err) {
+        console.warn('[Ticket] purge annulled:', ticket.id, err);
+        failed.push(ticket.id);
+      }
+    }
+    if (failed.length) {
+      toast(`No se pudieron limpiar ${failed.length} ticket(s). Revisa permisos Firestore.`, 'error');
+      return;
+    }
+    const ids = new Set(tickets.map((t) => t.id));
+    database.tickets = (database.tickets || []).filter((t) => !ids.has(t.id));
+    DatabaseModule.save();
+    TicketModule.render();
+    AdminModule.render();
+    this.render();
+    ReportModule.render();
+    toast('Tickets anulados limpiados definitivamente', 'success');
   }
 };
 
@@ -10970,7 +11182,7 @@ const AdminModule = {
       const metrics = ArturitoCloud.DashboardManager.computeMetrics(database);
       ArturitoCloud.DashboardManager.renderStatCards(document.getElementById('adminStats'), metrics);
     } else {
-      const t = database.tickets;
+      const t = database.tickets.filter((ticket) => !isTicketAnnulled(ticket));
       const stats = [
         { label:'Total Tickets', value: t.length, cls:'teal' },
         { label:'Abiertos', value: t.filter(x=>['Abierto','En Revisión','Asignado','En Proceso'].includes(x.estado)).length, cls:'amber' },
@@ -11107,7 +11319,7 @@ const ReportModule = {
     return {
       labels: ['Tickets', 'Usuarios', 'Conversaciones', 'Interacciones chat', 'Documentos'],
       values: [
-        database.tickets.length,
+        database.tickets.filter((t) => !isTicketAnnulled(t)).length,
         database.users.length,
         database.conversations.length,
         chatTotal,
@@ -11119,13 +11331,13 @@ const ReportModule = {
   countBy(field, labels) {
     const counts = {};
     labels.forEach(l => counts[l] = 0);
-    database.tickets.forEach(t => { if (counts[t[field]] !== undefined) counts[t[field]]++; else counts[t[field]] = (counts[t[field]]||0)+1; });
+    database.tickets.filter((t) => !isTicketAnnulled(t)).forEach(t => { if (counts[t[field]] !== undefined) counts[t[field]]++; else counts[t[field]] = (counts[t[field]]||0)+1; });
     return { labels: Object.keys(counts), values: Object.values(counts) };
   },
   /** Datos mensuales de tickets */
   monthlyData() {
     const months = {};
-    database.tickets.forEach(t => {
+    database.tickets.filter((t) => !isTicketAnnulled(t)).forEach(t => {
       const d = new Date(t.createdAt);
       const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
       months[key] = (months[key]||0)+1;
@@ -11206,7 +11418,7 @@ const ReportModule = {
 
 /* ─── NavModule ─── */
 const NavModule = {
-  titles: { admin:'Dashboard', tickets:'Gestión de Tickets', knowledge:'Entrenamiento IA', users:'Gestión de Usuarios', reports:'Reportes y Análisis', settings:'Configuración' },
+  titles: { admin:'Dashboard', tickets:'Gestión de Tickets', cancelledTickets:'Tickets anulados', knowledge:'Entrenamiento IA', users:'Gestión de Usuarios', reports:'Reportes y Análisis', settings:'Configuración' },
   /** Navega a una vista */
   go(view) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -11216,6 +11428,7 @@ const NavModule = {
     document.getElementById('pageTitle').textContent = this.titles[view]||view;
     if (view === 'admin') AdminModule.render();
     if (view === 'tickets') TicketModule.render();
+    if (view === 'cancelledTickets') CancelledTicketModule.render();
     if (view === 'knowledge') TrainingModule.render();
     if (view === 'users') UserModule.render();
     if (view === 'reports') setTimeout(() => ReportModule.render(), 100);
@@ -11248,7 +11461,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v44-admin-clean-categories';",
+    "const CACHE_NAME='arturito-ai-v47-purge-cancelled-tickets';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
