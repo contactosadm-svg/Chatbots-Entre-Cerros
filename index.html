@@ -2481,6 +2481,8 @@ const ARTURITO_GADGET_KB_SEED = [
       this.condominioId = null;
       this._modules = null;
       this._unsubs = [];
+      this.databaseUnavailable = false;
+      this.lastDatabaseError = null;
     }
 
     static getInstance() {
@@ -2531,7 +2533,20 @@ const ARTURITO_GADGET_KB_SEED = [
     }
 
     isEnabled() {
-      return this.enabled && !!this.db;
+      return this.enabled && !!this.db && !this.databaseUnavailable;
+    }
+
+    isMissingDatabaseError(err) {
+      const msg = String(err?.message || err || '');
+      return err?.code === 'not-found'
+        || /database .* does not exist/i.test(msg)
+        || /Failed to get document because the client is offline/i.test(msg);
+    }
+
+    markDatabaseUnavailable(err) {
+      this.databaseUnavailable = true;
+      this.lastDatabaseError = err || null;
+      console.info('[FirebaseManager] Base Firestore no disponible:', this.getFirestoreDatabaseId());
     }
 
     getCondominioId() {
@@ -2599,6 +2614,8 @@ const ARTURITO_GADGET_KB_SEED = [
         }
         this.storage = getStorage(this.app);
         this.enabled = true;
+        this.databaseUnavailable = false;
+        this.lastDatabaseError = null;
         this.condominioId = config.condominioId || DEFAULT_FIREBASE_CONFIG.condominioId || 'entre-cerros';
         this.firestoreDatabaseId = dbId;
         this.saveConfig({ ...config, condominioId: this.condominioId, firestoreDatabaseId: dbId });
@@ -2903,7 +2920,12 @@ const ARTURITO_GADGET_KB_SEED = [
           return prefix + String(next).padStart(4, '0');
         });
       } catch (err) {
-        console.warn('[Cloud] allocateTicketId:', err);
+        if (this.fb.isMissingDatabaseError?.(err)) {
+          this.fb.markDatabaseUnavailable?.(err);
+          console.info('[Cloud] allocateTicketId sin base Firestore; usando ID local temporal.');
+        } else {
+          console.warn('[Cloud] allocateTicketId:', err);
+        }
         return global.DatabaseModule?.generateTicketId?.() || (prefix + '0001');
       }
     }
@@ -3779,7 +3801,10 @@ const ARTURITO_GADGET_KB_SEED = [
         if (await this.pullTrainingData(forceServer)) changes.training = true;
       } catch (err) {
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
-        if (denied) {
+        if (this.fb.isMissingDatabaseError?.(err)) {
+          this.fb.markDatabaseUnavailable?.(err);
+          console.info('[CloudSync] Base Firestore no existe o no está disponible; usando respaldo local.');
+        } else if (denied) {
           console.info('[CloudSync] Datos públicos no disponibles para esta sesión; usando respaldo local.');
         } else {
           console.warn('[CloudSync] pullPublicCloudData:', err);
@@ -3810,7 +3835,10 @@ const ARTURITO_GADGET_KB_SEED = [
         if (snap.exists()) remote = snap.data() || {};
       } catch (err) {
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
-        if (denied) {
+        if (this.fb.isMissingDatabaseError?.(err)) {
+          this.fb.markDatabaseUnavailable?.(err);
+          console.info('[CloudSync] Configuración de correo no disponible: Firestore no disponible.');
+        } else if (denied) {
           console.info('[CloudSync] Configuración de correo no disponible para esta sesión.');
         } else {
           console.warn('[CloudSync] ensureTicketEmailSettings read:', err);
@@ -4648,6 +4676,29 @@ const ARTURITO_GADGET_KB_SEED = [
         return false;
       }
       try {
+        const databaseReady = await withTimeout(
+          fb.testConnection().then(() => true).catch((err) => {
+            if (fb.isMissingDatabaseError?.(err)) {
+              fb.markDatabaseUnavailable?.(err);
+              return false;
+            }
+            throw err;
+          }),
+          2200,
+          false,
+          'firestore'
+        );
+        if (!databaseReady || !fb.isEnabled()) {
+          if (!fb.databaseUnavailable) {
+            fb.markDatabaseUnavailable?.(new Error('Firestore no confirmó disponibilidad durante el inicio'));
+          }
+          UIManager.setCloudBadge(false, 'Firestore no disponible');
+          if (options.database) {
+            global.DatabaseModule?.ensurePublicKnowledgeFallback?.('Base Firestore no disponible');
+          }
+          return { mode: 'missing-firestore', cloudHasKnowledge: false, fallbackKnowledge: true };
+        }
+
         await withTimeout(auth.init(async (user) => {
           if (options.onAuthChange) options.onAuthChange(user);
           const realtimeEnabled = options.database?.settings?.enableRealtimeSync === true
@@ -8591,11 +8642,19 @@ const TicketEmailDebug = {
     if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) {
       return { ok: false, error: 'Firebase no conectado' };
     }
-    const { getDoc, getDocFromServer } = ArturitoCloud.fb._modules;
-    const cid = ArturitoCloud.fb.getCondominioId();
-    const ref = ArturitoCloud.fb.doc(`condominios/${cid}/settings/main`);
-    const snap = getDocFromServer ? await getDocFromServer(ref) : await getDoc(ref);
-    return { ok: true, exists: snap.exists(), data: snap.exists() ? snap.data() : {}, cid };
+    try {
+      const { getDoc, getDocFromServer } = ArturitoCloud.fb._modules;
+      const cid = ArturitoCloud.fb.getCondominioId();
+      const ref = ArturitoCloud.fb.doc(`condominios/${cid}/settings/main`);
+      const snap = getDocFromServer ? await getDocFromServer(ref) : await getDoc(ref);
+      return { ok: true, exists: snap.exists(), data: snap.exists() ? snap.data() : {}, cid };
+    } catch (err) {
+      if (ArturitoCloud.fb?.isMissingDatabaseError?.(err)) {
+        ArturitoCloud.fb.markDatabaseUnavailable?.(err);
+        return { ok: false, offline: true, error: 'Firestore no disponible' };
+      }
+      return { ok: false, error: err?.message || String(err) };
+    }
   },
   async ensureExtensionModeInCloud() {
     const cloud = await this.readCloudSettings();
@@ -8622,7 +8681,7 @@ const TicketEmailDebug = {
       ticketEmailMode: 'extension (Trigger Email)'
     });
     try {
-      if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.sync?.ensureTicketEmailSettings) {
+      if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled?.() && ArturitoCloud.sync?.ensureTicketEmailSettings) {
         await ArturitoCloud.sync.ensureTicketEmailSettings(database);
       }
       const cloud = await this.readCloudSettings();
@@ -8660,7 +8719,12 @@ const TicketEmailDebug = {
       }
       return { ok: issues.length === 0, issues, settings: s };
     } catch (err) {
-      this.warn('Error leyendo settings', err);
+      if (ArturitoCloud?.fb?.isMissingDatabaseError?.(err)) {
+        ArturitoCloud.fb.markDatabaseUnavailable?.(err);
+        this.log('Diagnóstico de nube no disponible', 'Firestore no disponible');
+        return { ok: false, offline: true, error: 'Firestore no disponible' };
+      }
+      this.warn('Error leyendo settings', err?.message || err);
       return { ok: false, error: err.message };
     }
   },
@@ -10249,7 +10313,7 @@ const TicketModule = {
         toast('Ticket actualizado', 'success');
       } else {
         let newId = DatabaseModule.generateTicketId();
-        if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.tickets?.allocateTicketId) {
+        if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled?.() && ArturitoCloud.tickets?.allocateTicketId) {
           newId = await ArturitoCloud.tickets.allocateTicketId();
         }
         const ticket = { id: newId, ...data, attachments: [], createdAt: Date.now() };
@@ -10261,8 +10325,10 @@ const TicketModule = {
           adjuntosPendientes: pendingCount,
           firebase: !!(typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled())
         });
-        await TicketEmailDebug.audit('Antes de crear ticket');
-        if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.sync?.ensureTicketEmailSettings) {
+        if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled?.()) {
+          await TicketEmailDebug.audit('Antes de crear ticket');
+        }
+        if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled?.() && ArturitoCloud.sync?.ensureTicketEmailSettings) {
           const synced = await ArturitoCloud.sync.ensureTicketEmailSettings(database);
           TicketEmailDebug.log('ensureTicketEmailSettings', synced ? 'campos faltantes escritos en Firestore' : 'sin cambios (revisar si SMTP está en panel admin)');
         }
@@ -10281,7 +10347,7 @@ const TicketModule = {
           }
         } else {
           TicketEmailDebug.warn('Firebase desconectado — no se puede crear ticket sin la nube');
-          toast('Sin conexión a la nube. No se puede registrar la solicitud.', 'error');
+          toast('La base Firestore no está disponible. Crea o despliega la base chatbostentrecerros para registrar solicitudes.', 'error');
           return;
         }
         if (!cloudSaved) return;
@@ -11721,7 +11787,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v26-db-chatbostentrecerros';",
+    "const CACHE_NAME='arturito-ai-v30-cloudsync-offline-guard';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
