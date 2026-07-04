@@ -819,6 +819,73 @@ body.mode-client #adminApp{display:none!important}
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1rem}
 .chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem}
 .chart-card h4{font-size:.85rem;margin-bottom:.75rem;color:var(--text-muted);font-weight:600}
+
+/* Microinteracciones: emojis estilo WhatsApp y estrellas animadas */
+.chat-emoji-popover{
+  display:none;position:absolute;bottom:calc(100% + 10px);left:.6rem;right:.6rem;
+  max-height:min(232px,42vh);overflow-y:auto;padding:.62rem;
+  background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.98));
+  border:1px solid rgba(148,163,184,.28);border-radius:22px;flex-wrap:wrap;gap:.28rem;
+  box-shadow:0 -18px 46px rgba(15,23,42,.18),0 1px 0 rgba(255,255,255,.9) inset;
+  z-index:20;-webkit-overflow-scrolling:touch;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  transform-origin:bottom center
+}
+.chat-dock.chat-emoji-open .chat-emoji-popover{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));animation:emojiTrayIn .18s cubic-bezier(.2,.9,.25,1.2)}
+.chat-emoji-popover::before{
+  content:'Emojis';grid-column:1/-1;font-size:.68rem;font-weight:800;color:#64748b;
+  letter-spacing:.04em;text-transform:uppercase;padding:.05rem .2rem .25rem
+}
+.chat-emoji-popover button,.emoji-btn,.ticket-response-emoji{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  border:none;background:transparent;cursor:pointer;line-height:1;user-select:none;-webkit-tap-highlight-color:transparent;
+  transition:transform .16s cubic-bezier(.2,.9,.25,1.4),background .16s,box-shadow .16s,filter .16s
+}
+.chat-emoji-popover button{
+  width:34px;height:34px;padding:0;border-radius:12px;font-size:1.35rem;color:inherit;
+  animation:emojiPop .24s cubic-bezier(.2,.9,.25,1.35) both;
+  animation-delay:calc(min(var(--emoji-i,0),24) * 10ms)
+}
+.chat-emoji-popover button:hover,.chat-emoji-popover button:focus-visible,
+.emoji-btn:hover,.emoji-btn:focus-visible,.ticket-response-emoji:hover,.ticket-response-emoji:focus-visible{
+  transform:translateY(-2px) scale(1.22) rotate(-3deg);
+  background:rgba(127,186,2,.12);box-shadow:0 8px 18px rgba(15,23,42,.12);filter:saturate(1.14);outline:none
+}
+.chat-emoji-popover button:active,.emoji-btn:active,.ticket-response-emoji:active{transform:scale(.88);animation:emojiBounce .32s ease}
+.ticket-response-emoji-row{padding:.45rem;border-radius:18px;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid rgba(148,163,184,.22);box-shadow:0 8px 24px rgba(15,23,42,.06) inset}
+.ticket-response-emoji{min-width:34px;height:34px;font-size:1.18rem;padding:0;border-radius:12px;background:#fff;border:1px solid rgba(148,163,184,.18)}
+.chat-rating-prompt{
+  position:relative;overflow:hidden;margin-top:.55rem;padding:.72rem .78rem;
+  background:linear-gradient(135deg,rgba(255,251,235,.96),rgba(240,253,244,.94));
+  border:1px solid rgba(245,158,11,.28);border-radius:16px;
+  box-shadow:0 10px 28px rgba(15,23,42,.08);animation:ratingPromptIn .24s cubic-bezier(.2,.9,.25,1.2)
+}
+.chat-rating-prompt::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 0%,rgba(255,255,255,.55) 45%,transparent 70%);transform:translateX(-120%);animation:ratingShine .75s ease .16s 1;pointer-events:none}
+.chat-rating-prompt p{font-size:.74rem;color:#92400e;margin:0 0 .46rem;font-weight:800}
+.chat-rating-stars{display:flex;gap:.18rem;align-items:center;flex-wrap:wrap}
+.chat-rating-stars button{
+  position:relative;background:none;border:none;font-size:1.55rem;line-height:1;cursor:pointer;color:#f59e0b;
+  opacity:.34;filter:grayscale(.35);transition:opacity .14s,transform .14s,filter .14s,text-shadow .14s;
+  padding:.04rem .12rem;text-shadow:none;transform-origin:center
+}
+.chat-rating-stars button:hover,.chat-rating-stars button:focus,
+.chat-rating-stars button.is-preview{opacity:1;filter:none;transform:translateY(-2px) scale(1.18);text-shadow:0 6px 14px rgba(245,158,11,.38);outline:none}
+.chat-rating-stars button.is-preview:nth-child(1){animation:starPulse .28s ease both}
+.chat-rating-stars button.is-preview:nth-child(2){animation:starPulse .28s ease .03s both}
+.chat-rating-stars button.is-preview:nth-child(3){animation:starPulse .28s ease .06s both}
+.chat-rating-stars button.is-preview:nth-child(4){animation:starPulse .28s ease .09s both}
+.chat-rating-stars button.is-preview:nth-child(5){animation:starPulse .28s ease .12s both}
+.chat-rating-stars button:active{transform:scale(.86)}
+.chat-rating-done{display:inline-flex;align-items:center;gap:.1rem;font-size:.78rem;color:#92400e;margin-top:.45rem;font-weight:800;background:#fef3c7;border:1px solid rgba(245,158,11,.3);border-radius:999px;padding:.24rem .58rem;animation:ratingDonePop .26s cubic-bezier(.2,.9,.25,1.25)}
+@keyframes emojiTrayIn{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes emojiPop{from{opacity:0;transform:translateY(8px) scale(.78)}to{opacity:1;transform:none}}
+@keyframes emojiBounce{0%{transform:scale(.9)}60%{transform:scale(1.22)}100%{transform:scale(1)}}
+@keyframes ratingPromptIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes ratingShine{to{transform:translateX(120%)}}
+@keyframes starPulse{0%{transform:scale(.9)}55%{transform:translateY(-3px) scale(1.24)}100%{transform:translateY(-2px) scale(1.18)}}
+@keyframes ratingDonePop{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  .chat-emoji-popover,.chat-emoji-popover button,.chat-rating-prompt,.chat-rating-prompt::after,.chat-rating-stars button,.chat-rating-done{animation:none!important;transition:none!important}
+}
 </style>
 <script>
 (function(){
@@ -7794,8 +7861,8 @@ const ChatModule = {
   renderChatShortcuts() {
     const bar = document.getElementById('emojiBar');
     if (!bar) return;
-    bar.innerHTML = getChatShortcuts().map(s =>
-      `<button type="button" class="chat-shortcut-btn" title="${escapeHtml(s.text)}" data-text="${escapeHtml(s.text)}">${icon(s.icon, 'md')}</button>`
+    bar.innerHTML = getChatShortcuts().map((s, index) =>
+      `<button type="button" class="chat-shortcut-btn" title="${escapeHtml(s.text)}" aria-label="${escapeHtml(s.text)}" data-text="${escapeHtml(s.text)}" style="--emoji-i:${index}">${icon(s.icon, 'md')}</button>`
     ).join('');
     if (!bar.dataset.bound) {
       bar.dataset.bound = '1';
@@ -8161,6 +8228,28 @@ const ChatModule = {
     const box = document.getElementById('chatMessages');
     if (!box || box.dataset.ratingBound) return;
     box.dataset.ratingBound = '1';
+    const previewStars = (group, value = 0) => {
+      if (!group) return;
+      group.querySelectorAll('[data-rate]').forEach((btn) => {
+        btn.classList.toggle('is-preview', Number(btn.dataset.rate) <= value);
+      });
+    };
+    box.addEventListener('mouseover', (e) => {
+      const rateBtn = e.target.closest('[data-rate]');
+      if (rateBtn) previewStars(rateBtn.closest('.chat-rating-stars'), Number(rateBtn.dataset.rate));
+    });
+    box.addEventListener('mouseout', (e) => {
+      const group = e.target.closest?.('.chat-rating-stars');
+      if (group && !group.contains(e.relatedTarget)) previewStars(group, 0);
+    });
+    box.addEventListener('focusin', (e) => {
+      const rateBtn = e.target.closest('[data-rate]');
+      if (rateBtn) previewStars(rateBtn.closest('.chat-rating-stars'), Number(rateBtn.dataset.rate));
+    });
+    box.addEventListener('focusout', (e) => {
+      const group = e.target.closest?.('.chat-rating-stars');
+      if (group) previewStars(group, 0);
+    });
     box.addEventListener('click', (e) => {
       const rateBtn = e.target.closest('[data-rate]');
       if (rateBtn) {
@@ -9587,8 +9676,8 @@ const TicketManageModule = {
     const emojiRow = document.getElementById('tmEmojiRow');
     const templateRow = document.getElementById('tmTemplateRow');
     if (emojiRow) {
-      emojiRow.innerHTML = this.emojis.map((emoji) =>
-        `<button type="button" class="ticket-response-emoji" data-tm-emoji="${escapeHtml(emoji)}" title="Insertar ${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`
+      emojiRow.innerHTML = this.emojis.map((emoji, index) =>
+        `<button type="button" class="ticket-response-emoji" data-tm-emoji="${escapeHtml(emoji)}" title="Insertar ${escapeHtml(emoji)}" aria-label="Insertar ${escapeHtml(emoji)}" style="--emoji-i:${index}">${escapeHtml(emoji)}</button>`
       ).join('');
     }
     if (templateRow) {
