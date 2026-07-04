@@ -1242,7 +1242,7 @@ body.mode-client #adminApp{display:none!important}
           </form>
           <div class="firebase-config-card">
             <h3>Firebase Cloud</h3>
-            <p>Proyecto <strong>chatbostentrecerros</strong>. Firestore: base <strong>chatbostentrecerros</strong> · región <strong>Santiago (southamerica-west1)</strong>. Cola de correo: colección raíz <strong>mail/</strong> procesada por la extensión <strong>Trigger Email</strong>.</p>
+            <p>Proyecto <strong>chatbostentrecerros</strong>. Firestore: base <strong>chatbotentrecerros</strong> · región <strong>Santiago (southamerica-west1)</strong>. Cola de correo: colección raíz <strong>mail/</strong> procesada por la extensión <strong>Trigger Email</strong>.</p>
             <form id="firebaseConfigForm" class="form-grid">
               <div class="form-group"><label>API Key</label><input type="text" id="fbApiKey" autocomplete="off" value="AIzaSyDyP2SN4_AoOMleTxsydfjG3wvdDo_Ir-o"></div>
               <div class="form-group"><label>Auth Domain</label><input type="text" id="fbAuthDomain" value="chatbostentrecerros.firebaseapp.com"></div>
@@ -1251,7 +1251,7 @@ body.mode-client #adminApp{display:none!important}
               <div class="form-group"><label>Messaging Sender ID</label><input type="text" id="fbMessagingSenderId" value="326324168069"></div>
               <div class="form-group"><label>App ID</label><input type="text" id="fbAppId" value="1:326324168069:web:7a42605da61f53632f90ec"></div>
               <div class="form-group full"><label>ID Condominio (multi-tenant)</label><input type="text" id="fbCondominioId" value="entre-cerros"></div>
-              <div class="form-group"><label>Base de datos Firestore</label><input type="text" id="fbFirestoreDatabaseId" value="chatbostentrecerros" placeholder="chatbostentrecerros"></div>
+              <div class="form-group"><label>Base de datos Firestore</label><input type="text" id="fbFirestoreDatabaseId" value="chatbotentrecerros" placeholder="chatbotentrecerros"></div>
               <div class="form-group"><label>Ubicación Firestore</label><input type="text" id="fbFirestoreLocation" value="Santiago (southamerica-west1)" readonly></div>
               <div class="form-group full" style="display:flex;gap:.5rem;flex-wrap:wrap">
                 <button type="button" class="btn btn-secondary btn-sm" id="btnTestFirebase">Probar conexión</button>
@@ -2423,14 +2423,14 @@ const ARTURITO_GADGET_KB_SEED = [
     messagingSenderId: '326324168069',
     appId: '1:326324168069:web:7a42605da61f53632f90ec',
     condominioId: 'entre-cerros',
-    firestoreDatabaseId: 'chatbostentrecerros',
+    firestoreDatabaseId: 'chatbotentrecerros',
     firestoreLocation: 'southamerica-west1',
     firestoreLocationLabel: 'Santiago (southamerica-west1)'
   };
 
   /** Alineado con extensión Trigger Email / Firebase Console */
   const ARTURITO_FIREBASE_EMAIL_DEFAULTS = {
-    firestoreDatabaseId: 'chatbostentrecerros',
+    firestoreDatabaseId: 'chatbotentrecerros',
     firestoreLocation: 'southamerica-west1',
     firestoreLocationLabel: 'Santiago (southamerica-west1)',
     mailCollection: 'mail',
@@ -2496,25 +2496,7 @@ const ARTURITO_GADGET_KB_SEED = [
         ...(global.__ARTURITO_FIREBASE_CONFIG__ || {})
       };
       try {
-        const raw = localStorage.getItem(FIREBASE_CONFIG_KEY);
-        if (raw) {
-          const saved = JSON.parse(raw);
-          const savedDbId = saved.firestoreDatabaseId && saved.firestoreDatabaseId !== '(default)'
-            ? saved.firestoreDatabaseId
-            : base.firestoreDatabaseId;
-          return {
-            ...base,
-            ...saved,
-            apiKey: base.apiKey,
-            authDomain: base.authDomain,
-            projectId: base.projectId,
-            storageBucket: base.storageBucket,
-            messagingSenderId: base.messagingSenderId,
-            appId: base.appId,
-            condominioId: base.condominioId,
-            firestoreDatabaseId: savedDbId || 'chatbostentrecerros'
-          };
-        }
+        localStorage.removeItem(FIREBASE_CONFIG_KEY);
       } catch (_) {}
       return base.apiKey ? base : null;
     }
@@ -2524,7 +2506,7 @@ const ARTURITO_GADGET_KB_SEED = [
     }
 
     saveConfig(config) {
-      localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(config));
+      try { localStorage.removeItem(FIREBASE_CONFIG_KEY); } catch (_) {}
     }
 
     clearConfig() {
@@ -2554,7 +2536,7 @@ const ARTURITO_GADGET_KB_SEED = [
     }
 
     getFirestoreDatabaseId() {
-      return this.firestoreDatabaseId || 'chatbostentrecerros';
+      return this.firestoreDatabaseId || 'chatbotentrecerros';
     }
 
     col(name) {
@@ -2599,7 +2581,7 @@ const ARTURITO_GADGET_KB_SEED = [
           this.app = initializeApp(config);
         }
         this.auth = getAuth(this.app);
-        const dbId = config.firestoreDatabaseId || DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId || 'chatbostentrecerros';
+        const dbId = config.firestoreDatabaseId || DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId || 'chatbotentrecerros';
         const firestoreSettings = {
           experimentalForceLongPolling: true,
           useFetchStreams: false,
@@ -2989,7 +2971,7 @@ const ARTURITO_GADGET_KB_SEED = [
       try {
         mailId = await global.TicketEmailDebug?.queueMailForTicket?.(id, localTicket);
         if (mailId) {
-          global.TicketEmailDebug?.log('Correo encolado', { path: `mail/${mailId}`, database: 'chatbostentrecerros' });
+          global.TicketEmailDebug?.log('Correo encolado', { path: `mail/${mailId}`, database: 'chatbotentrecerros' });
         }
       } catch (err) {
         console.info('[TicketEmail] No se pudo preparar correo desde la app:', err?.message || err);
@@ -3114,7 +3096,7 @@ const ARTURITO_GADGET_KB_SEED = [
     async getByIdViaRest(ticketId, condominioIds = ['entre-cerros', 'default']) {
       const cfg = this.fb.getDefaultConfig?.() || {};
       const project = cfg.projectId || 'chatbostentrecerros';
-      const dbId = this.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros';
+      const dbId = this.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros';
       for (const cid of condominioIds) {
         try {
           const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/${dbId}/documents/condominios/${cid}/tickets/${encodeURIComponent(ticketId)}`;
@@ -3173,7 +3155,7 @@ const ARTURITO_GADGET_KB_SEED = [
     async listResponsesViaRest(ticketId, condominioId = 'entre-cerros') {
       const cfg = this.fb.getDefaultConfig?.() || {};
       const project = cfg.projectId || 'chatbostentrecerros';
-      const dbId = this.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros';
+      const dbId = this.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros';
       try {
         const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/${dbId}/documents/condominios/${condominioId}:runQuery`;
         const res = await fetch(url, {
@@ -3803,9 +3785,9 @@ const ARTURITO_GADGET_KB_SEED = [
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
         if (this.fb.isMissingDatabaseError?.(err)) {
           this.fb.markDatabaseUnavailable?.(err);
-          console.info('[CloudSync] Base Firestore no existe o no está disponible; usando respaldo local.');
+          console.info('[CloudSync] Base Firestore no disponible; sin respaldo local.');
         } else if (denied) {
-          console.info('[CloudSync] Datos públicos no disponibles para esta sesión; usando respaldo local.');
+          console.info('[CloudSync] Datos públicos no disponibles para esta sesión; sin respaldo local.');
         } else {
           console.warn('[CloudSync] pullPublicCloudData:', err);
         }
@@ -4374,13 +4356,13 @@ const ARTURITO_GADGET_KB_SEED = [
     }
 
 
-    /** Persiste en Firestore según scope; scope 'local' = solo memoria de sesión (chat, UI) */
+    /** Persiste en Firestore según scope; scope 'local' = estado transitorio de UI, nunca fuente de datos */
     async persist(database, scope = 'local', options = {}) {
       if (!database.manualKnowledge) {
         database.manualKnowledge = (database.knowledge || []).filter((k) => k.origin !== 'gadget');
       }
       if (scope === 'local') {
-        return { cloud: false, memory: true };
+        return { cloud: false, transient: true };
       }
       if (!this.fb.isEnabled()) {
         global.toast?.('Sin conexión a Firebase. El cambio no se guardó.', 'error');
@@ -4490,28 +4472,12 @@ const ARTURITO_GADGET_KB_SEED = [
       }
 
       const cloudHasKnowledge = this.sync._cloudKnowledgeActive === true;
-      const canSeedCloud = this.sync.auth?.isStaff?.(this.sync.auth.currentUser) === true;
 
-      if (!cloudHasKnowledge && canSeedCloud) {
-        try {
-          if (global.DatabaseModule?.seedGadgetTemplate) global.DatabaseModule.seedGadgetTemplate();
-          await this.sync.ensureCondominioDoc(database.settings?.buildingName);
-          const mig = await this.sync.migrateLocalToCloud(database);
-          if (mig?.ok) migrated = true;
-          this.sync._cloudKBActive = true;
-          this.sync._cloudKnowledgeActive = true;
-          this.sync._cloudSettingsActive = true;
-        } catch (err) {
-          console.warn('[DataStore] migrateLocalToCloud:', err);
-        }
-      } else if (!cloudHasKnowledge) {
-        const seeded = global.DatabaseModule?.ensurePublicKnowledgeFallback?.('Firestore no tiene temas publicados');
-        if (!seeded) {
-          database.gadgetKB = database.gadgetKB || [];
-          database.manualKnowledge = database.manualKnowledge || [];
-          database.knowledge = database.knowledge || [];
-        }
-        console.info('[DataStore] Respaldo embebido de conocimiento activo para residentes.');
+      if (!cloudHasKnowledge) {
+        database.gadgetKB = [];
+        database.manualKnowledge = [];
+        database.knowledge = [];
+        console.info('[DataStore] Firestore no tiene conocimiento publicado; la app no usará conocimiento local.');
       }
 
       this.sync.applyUnifiedKnowledge(database);
@@ -4530,7 +4496,7 @@ const ARTURITO_GADGET_KB_SEED = [
         mode: 'cloud',
         migrated,
         cloudHasKnowledge: this.sync._cloudKnowledgeActive === true,
-        fallbackKnowledge: this.sync._cloudKnowledgeActive !== true && !!((database.gadgetKB || []).length || (database.manualKnowledge || []).length)
+        fallbackKnowledge: false
       };
     }
 
@@ -4693,10 +4659,7 @@ const ARTURITO_GADGET_KB_SEED = [
             fb.markDatabaseUnavailable?.(new Error('Firestore no confirmó disponibilidad durante el inicio'));
           }
           UIManager.setCloudBadge(false, 'Firestore no disponible');
-          if (options.database) {
-            global.DatabaseModule?.ensurePublicKnowledgeFallback?.('Base Firestore no disponible');
-          }
-          return { mode: 'missing-firestore', cloudHasKnowledge: false, fallbackKnowledge: true };
+          return false;
         }
 
         await withTimeout(auth.init(async (user) => {
@@ -4712,12 +4675,10 @@ const ARTURITO_GADGET_KB_SEED = [
           boot = await withTimeout(
             store.bootstrap(options.database, { onSync: options.onSync }),
             2500,
-            { mode: 'cloud-timeout', cloudHasKnowledge: false, fallbackKnowledge: true },
+            false,
             'bootstrap'
           );
-          if (boot?.mode === 'cloud-timeout') {
-            global.DatabaseModule?.ensurePublicKnowledgeFallback?.('Tiempo de espera al conectar con Firestore');
-          }
+          if (!boot) return false;
         }
         UIManager.setCloudBadge(true, 'Firebase · ' + fb.getCondominioId());
         return boot || true;
@@ -4923,29 +4884,14 @@ const DatabaseModule = {
       }
     } catch (_) {}
   },
-  /** Semilla Gadget solo para primera migración a nube vacía */
+  /** Semilla embebida desactivada: Firestore es la única fuente de verdad */
   seedGadgetTemplate() {
-    if (typeof ARTURITO_GADGET_KB_SEED === 'undefined') return false;
-    database.gadgetKB = JSON.parse(JSON.stringify(ARTURITO_GADGET_KB_SEED)).map(e => ({ ...e, createdAt: Date.now() }));
-    if (typeof KnowledgeBaseModule !== 'undefined') KnowledgeBaseModule.syncFromGadget();
-    return true;
+    return false;
   },
-  /** Activa una base pública embebida cuando Firestore aún no tiene conocimiento */
+  /** No usa conocimiento embebido: la app espera datos publicados en Firestore */
   ensurePublicKnowledgeFallback(reason = '') {
-    const hasKnowledge = (database.gadgetKB || []).some(e => e.enabled !== false)
-      || (database.manualKnowledge || []).some(e => e.enabled !== false)
-      || (database.knowledge || []).some(e => e.enabled !== false);
-    if (hasKnowledge) {
-      if (typeof KnowledgeBaseModule !== 'undefined') KnowledgeBaseModule.syncFromGadget();
-      return false;
-    }
-    const seeded = this.seedGadgetTemplate();
-    if (seeded) {
-      database.settings = database.settings || {};
-      database.settings.knowledgeFallbackActive = true;
-      if (reason) console.warn('[Database] Base pública embebida activa:', reason);
-    }
-    return seeded;
+    if (reason) console.info('[Database] Conocimiento embebido desactivado; esperando Firestore:', reason);
+    return false;
   },
   /** Crea estructura inicial limpia (sin datos piloto) */
   seed() {
@@ -5049,7 +4995,7 @@ const DatabaseModule = {
     }
     if (typeof KnowledgeBaseModule !== 'undefined') KnowledgeBaseModule.syncFromGadget();
   },
-  /** Persiste en Firestore (UnifiedDataStore). scope: local = solo estado de sesión (chat UI) | settings | gadgetKB | knowledge | analytics | full */
+  /** Persiste en Firestore (UnifiedDataStore). scope: local = estado transitorio de UI | settings | gadgetKB | knowledge | analytics | full */
   async save(scope = 'local', options = {}) {
     if (scope !== 'local' && (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.store?.isCloud?.())) {
       toast('Sin conexión a la nube. El cambio no se guardó.', 'error');
@@ -5058,7 +5004,7 @@ const DatabaseModule = {
     if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.store) {
       return ArturitoCloud.store.persist(database, scope, options);
     }
-    return { cloud: false, memory: scope === 'local' };
+    return { cloud: false, transient: scope === 'local' };
   },
   /** Genera ID único */
   uid(prefix = 'id') { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,5); },
@@ -5199,7 +5145,7 @@ function formatChatShortcuts(shortcuts) {
   return (shortcuts || []).map(s => `${s.icon}:${s.text}`).join('\n');
 }
 
-/* ─── IDBModule — Caché en memoria (datos en Firestore chatbostentrecerros) ─── */
+/* ─── IDBModule — Caché en memoria (datos en Firestore chatbotentrecerros) ─── */
 const IDBModule = {
   documentsCache: [],
   topicsCache: [],
@@ -6742,7 +6688,7 @@ const SettingsModule = {
   }
 };
 
-/* ─── AuthModule — Acceso administrativo (local + Firebase Auth) ─── */
+/* ─── AuthModule — Acceso administrativo (Firebase como fuente; sin sesión local persistida) ─── */
 const AuthModule = {
   currentUser: null,
   useFirebase() {
@@ -6754,16 +6700,6 @@ const AuthModule = {
       this.currentUser = ArturitoCloud.auth.currentUser;
       return ArturitoCloud.auth.isStaff(this.currentUser);
     }
-    try {
-      const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
-      if (s && s.email && Date.now() - s.ts < 86400000) {
-        const u = database.users.find(x => x.email === s.email);
-        if (u && ['Administrador','Conserje','Comité','SuperAdmin','Supervisor','Operador'].includes(u.rol)) {
-          this.currentUser = u;
-          return true;
-        }
-      }
-    } catch(e) {}
     sessionStorage.removeItem(SESSION_KEY);
     return false;
   },
@@ -6780,11 +6716,6 @@ const AuthModule = {
       try {
         const user = await ArturitoCloud.auth.login(email, pass);
         this.currentUser = user;
-        if (!ArturitoCloud.sync?._cloudKnowledgeActive && !(database.gadgetKB || []).length) {
-          DatabaseModule.seedGadgetTemplate();
-        }
-        await DatabaseModule.save('full', { fullSync: true });
-        ArturitoCloud.sync._cloudKnowledgeActive = !!((database.gadgetKB || []).length || (database.manualKnowledge || []).length);
         await RAGModule.rebuildIndex();
         this.hideLogin();
         App.setMode('admin');
@@ -6800,7 +6731,6 @@ const AuthModule = {
     const key = database.settings.adminKey || 'admin123';
     if (user && pass === key) {
       this.currentUser = user;
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ email, ts: Date.now() }));
       this.hideLogin();
       App.setMode('admin');
       toast('Bienvenido, ' + user.nombre, 'success');
@@ -6987,6 +6917,7 @@ const ArturitoModule = {
 const GadgetModule = {
   _autoOpenTimer: null,
   _toggleAnimTimer: null,
+  _dismissed: false,
   ANIM_MS: 480,
 
   /** Inicializa el gadget flotante */
@@ -7009,7 +6940,7 @@ const GadgetModule = {
   /** Abre el chat automáticamente ~5 s después de cargar (solo portal residente) */
   scheduleAutoOpen() {
     clearTimeout(this._autoOpenTimer);
-    if (sessionStorage.getItem('arturito_chat_dismissed')) return;
+    if (this._dismissed) return;
     this._autoOpenTimer = setTimeout(() => {
       const dock = document.getElementById('chatDock');
       if (!document.body.classList.contains('mode-client')) return;
@@ -7051,7 +6982,7 @@ const GadgetModule = {
       panel?.setAttribute('aria-hidden', 'true');
       panel?.removeAttribute('aria-modal');
       backdrop?.setAttribute('aria-hidden', 'true');
-      sessionStorage.setItem('arturito_chat_dismissed', '1');
+      this._dismissed = true;
       ArturitoModule.onChatClose();
       this._toggleAnimTimer = setTimeout(() => {
         dock.classList.remove('chat-closing', 'chat-animating');
@@ -8696,7 +8627,7 @@ const TicketEmailDebug = {
       }
       this.log('Envío vía mail/', 'Extensión Trigger Email configurada para Entre Cerros');
       this.log('Config Firestore (settings/main)', {
-        database: ArturitoCloud.fb?.getFirestoreDatabaseId?.() || 'chatbostentrecerros',
+        database: ArturitoCloud.fb?.getFirestoreDatabaseId?.() || 'chatbotentrecerros',
         path: `condominios/${cloud.cid}/settings/main`,
         notifyAdminEmail: s.notifyAdminEmail || '(vacío)',
         smtpReplyTo: s.smtpReplyTo || '(vacío)',
@@ -8708,8 +8639,8 @@ const TicketEmailDebug = {
         extension: 'firebase/firestore-send-email',
         smtpConfig: 'extensions/firestore-send-email.env',
         notifyAdminOnTicket: 'respaldo si la app no creó mail/',
-        database: 'chatbostentrecerros',
-        mailPath: 'Firestore → chatbostentrecerros → mail → doc id = TK-YYYYMMDD-0001',
+        database: 'chatbotentrecerros',
+        mailPath: 'Firestore → chatbotentrecerros → mail → doc id = TK-YYYYMMDD-0001',
         logs: 'Firebase Console → Extensions → Trigger Email → Logs'
       });
       if (issues.length) {
@@ -8897,7 +8828,7 @@ const TicketEmailDebug = {
     statusEl.innerHTML = `
       <span class="mail-badge ${p.cls}">${p.label}</span>
       <div style="margin-top:.35rem;color:var(--text-muted);font-size:.78rem">
-        Ruta: <code>mail/${this._escapeHtml(ticketId)}</code> · Base chatbostentrecerros<br>
+        Ruta: <code>mail/${this._escapeHtml(ticketId)}</code> · Base chatbotentrecerros<br>
         ${p.status === 'sent' ? `Enviado: ${sentStr}` : ''}
         ${p.status === 'error' ? `Error: ${this._escapeHtml(p.detail)}` : ''}
         ${p.status === 'pending' ? 'Esperando confirmación del servicio de correo' : ''}
@@ -9061,7 +8992,7 @@ const TicketEmailDebug = {
         ticketId,
         condominioId: typeof ArturitoCloud !== 'undefined' ? ArturitoCloud.fb.getCondominioId() : 'entre-cerros',
         source: 'app',
-        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros',
+        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros',
         statusUrl: email.statusUrl,
         createdAt: serverTimestamp()
       }
@@ -9142,7 +9073,7 @@ const TicketEmailDebug = {
       this.log('mail/ ya existe para este ticket', {
         mailId: ticketId,
         path: `mail/${ticketId}`,
-        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros'
+        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros'
       });
       void this.watchMailDelivery(ticketId);
       void this.queueClientConfirmationMail(ticketId, ticket, settings);
@@ -9159,14 +9090,14 @@ const TicketEmailDebug = {
         ticketId,
         condominioId: email.condominioId,
         source: 'app',
-        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros',
+        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros',
         createdAt: serverTimestamp()
       }
     });
     this.log('✓ Documento creado en mail/', {
       mailId: ticketId,
       path: `mail/${ticketId}`,
-      database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros',
+      database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros',
       to: to.join(', ')
     });
     void this.watchMailDelivery(ticketId);
@@ -9202,7 +9133,7 @@ const TicketEmailDebug = {
         ticketId,
         condominioId: typeof ArturitoCloud !== 'undefined' ? ArturitoCloud.fb.getCondominioId() : 'entre-cerros',
         source: 'app',
-        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros',
+        database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros',
         statusUrl: email.statusUrl,
         createdAt: serverTimestamp()
       }
@@ -9216,7 +9147,7 @@ const TicketEmailDebug = {
     if (!mailId || typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) return;
     const { doc, getDoc, getDocFromServer } = ArturitoCloud.fb._modules;
     const ref = doc(ArturitoCloud.fb.db, 'mail', mailId);
-    const dbId = ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbostentrecerros';
+    const dbId = ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros';
     this.log('Esperando Trigger Email…', { mailId, database: dbId });
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 2000));
@@ -9263,7 +9194,7 @@ const TicketEmailDebug = {
     return { ok: false, timeout: true };
   },
   async afterTicketCreated(ticketId, ticket) {
-    this.log('✓ Ticket creado — mail/' + ticketId, { ticketId, mailPath: `mail/${ticketId}`, database: 'chatbostentrecerros' });
+    this.log('✓ Ticket creado — mail/' + ticketId, { ticketId, mailPath: `mail/${ticketId}`, database: 'chatbotentrecerros' });
     toast('Ticket creado correctamente.', 'success');
     const clientEmail = this._parseEmails(ticket?.email)[0];
     if (clientEmail) {
@@ -10347,7 +10278,7 @@ const TicketModule = {
           }
         } else {
           TicketEmailDebug.warn('Firebase desconectado — no se puede crear ticket sin la nube');
-          toast('La base Firestore no está disponible. Crea o despliega la base chatbostentrecerros para registrar solicitudes.', 'error');
+          toast('La base Firestore no está disponible. Crea o despliega la base chatbotentrecerros para registrar solicitudes.', 'error');
           return;
         }
         if (!cloudSaved) return;
@@ -11787,7 +11718,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v30-cloudsync-offline-guard';",
+    "const CACHE_NAME='arturito-ai-v32-db-chatbotentrecerros';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
@@ -11927,7 +11858,7 @@ const App = {
       try {
         this.showCloudSyncLoading(true, 'Descargando configuración y conocimiento...');
         cloudBoot = await ArturitoCloud.init({ database, ...cloudHandlers });
-        cloudOk = !!cloudBoot;
+        cloudOk = !!cloudBoot && ArturitoCloud.fb?.isEnabled?.() === true;
       } catch (err) {
         console.warn('[ArturitoCloud] init falló:', err);
         ArturitoCloud.UIManager.setCloudBadge(false, 'Error Firebase');
@@ -11944,12 +11875,9 @@ const App = {
       await RAGModule.rebuildIndex();
       this.showCloudSyncLoading(false);
       void TicketEmailDebug.audit('Al cargar la app');
-    } else if (typeof ArturitoCloud !== 'undefined' && ArturitoCloud.fb?.isEnabled?.()) {
-      this.showCloudSyncLoading(false);
-      toast('Modo consulta de tickets activo. Algunas funciones admin pueden estar limitadas.', 'warning');
     } else {
       this.showCloudSyncLoading(true, 'Conexión a la nube requerida',
-        'No pudimos conectar con los datos del edificio. Verifica internet y recarga.');
+        'La app usa Firestore como fuente única. Verifica que la base chatbotentrecerros exista, esté desplegada y recarga.');
       return;
     }
 
