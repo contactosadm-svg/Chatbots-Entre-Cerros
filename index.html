@@ -7899,6 +7899,7 @@ const ChatModule = {
     });
     document.getElementById('chatSearchHistory').addEventListener('input', e => this.renderHistory(e.target.value));
     this.bindRatingEvents();
+    this.bindMessageActionEvents();
   },
   /** Renderiza preguntas rápidas en barra horizontal */
   renderQuickQuestions() {
@@ -8022,8 +8023,8 @@ const ChatModule = {
     const botName = database.settings.botName || 'Arturito';
     let actions = '';
     if (m.type === 'bot' && m.actions) {
-      actions = '<div class="chat-msg-actions-btns">' + m.actions.map(a =>
-        `<button type="button" onclick="${a.fn}">${a.icon ? icon(a.icon, 'sm') + ' ' : ''}${escapeHtml(a.label)}</button>`).join('') + '</div>';
+      actions = '<div class="chat-msg-actions-btns">' + m.actions.map((a, index) =>
+        `<button type="button" data-chat-action="${index}">${a.icon ? icon(a.icon, 'sm') + ' ' : ''}${escapeHtml(a.label)}</button>`).join('') + '</div>';
     }
     let bodyContent;
     if (isUser) {
@@ -8122,6 +8123,49 @@ const ChatModule = {
         this.onTopicSelected(link.dataset.entryId, link.dataset.question);
       };
     });
+  },
+  /** Ejecuta acciones del chat sin compilar JavaScript inline */
+  bindMessageActionEvents() {
+    const box = document.getElementById('chatMessages');
+    if (!box || box.dataset.actionBound) return;
+    box.dataset.actionBound = '1';
+    box.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-chat-action]');
+      if (!btn) return;
+      e.preventDefault();
+      const row = btn.closest('[data-msg-id]');
+      const conv = this.getCurrent();
+      const msg = conv?.messages?.find((m) => m.id === row?.dataset.msgId);
+      const action = msg?.actions?.[Number(btn.dataset.chatAction)];
+      this.runMessageAction(action);
+    });
+  },
+  runMessageAction(action) {
+    if (!action) return;
+    if (action.type === 'ticketCreate' || action.fn === 'TicketModule.openCreateFromChat()') {
+      TicketModule.openCreateFromChat();
+      return;
+    }
+    if (action.type === 'escalate' || action.fn === 'ChatModule.escalateFromChat()') {
+      this.escalateFromChat();
+      return;
+    }
+    if (action.type === 'topicsMenu' || action.fn === 'ChatModule.showTopicsMenu()') {
+      this.showTopicsMenu();
+      return;
+    }
+    if (action.type === 'residentReply' && action.ticketId) {
+      TicketLookupModule.startResidentReply(action.ticketId);
+      return;
+    }
+    const residentReply = String(action.fn || '').match(/^TicketLookupModule\.startResidentReply\((".*")\)$/);
+    if (residentReply) {
+      try {
+        TicketLookupModule.startResidentReply(JSON.parse(residentReply[1]));
+      } catch (err) {
+        console.warn('[ChatAction] ticketId inválido:', err);
+      }
+    }
   },
   /** Responde al seleccionar un tema del menú o sugerencia relacionada */
   onTopicSelected(entryId, question) {
