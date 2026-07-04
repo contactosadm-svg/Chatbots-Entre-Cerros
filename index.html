@@ -125,6 +125,20 @@ label{font-size:.8rem;font-weight:500;color:var(--text-muted)}
 input,select,textarea{padding:.6rem .85rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text);font-size:.875rem;transition:border var(--transition);font-family:inherit}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 20%,transparent)}
 textarea{resize:vertical;min-height:80px}
+.admin-settings-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);gap:1rem;grid-column:1/-1}
+.settings-panel{border:1px solid var(--border);border-radius:var(--radius);padding:1rem;background:color-mix(in srgb,var(--bg-card) 92%,var(--primary) 4%)}
+.settings-panel-title{font-weight:800;font-size:.95rem;margin-bottom:.25rem;color:var(--text)}
+.settings-panel-subtitle{font-size:.78rem;color:var(--text-muted);line-height:1.45;margin-bottom:.85rem}
+.category-add-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.85rem}
+.category-add-row input{flex:1}
+.category-list{display:flex;flex-direction:column;gap:.5rem}
+.category-item{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.6rem;align-items:center;padding:.7rem .75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)}
+.category-name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.category-mayordomo{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--text-muted);cursor:pointer;white-space:nowrap}
+.category-mayordomo input{width:auto}
+.admin-simple-note{font-size:.78rem;color:var(--text-muted);line-height:1.45;margin-top:.55rem}
+.admin-technical{display:none!important}
+@media(max-width:900px){.admin-settings-grid{grid-template-columns:1fr}.category-item{grid-template-columns:1fr}.category-mayordomo{justify-content:flex-start}}
 
 /* Tables */
 .table-wrap{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border)}
@@ -1219,31 +1233,47 @@ body.mode-client #adminApp{display:none!important}
             <div class="form-group full" style="margin-top:.5rem;padding-top:1rem;border-top:1px dashed var(--border)">
               <div style="font-weight:700;margin-bottom:.75rem;font-size:.95rem">Notificaciones por correo (tickets)</div>
             </div>
-            <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" readonly required><p class="ticket-hint" style="margin:.35rem 0 0">Destinatario principal fijo para avisos de nuevo ticket.</p></div>
-            <div class="form-group full"><label>Correo en copia (CC)</label><input type="email" id="setNotifyCcEmail" placeholder="opcional@entrecerros.cl"><p class="ticket-hint" style="margin:.35rem 0 0">Opcional. Este correo recibe copia del aviso de nuevo ticket, no reemplaza al administrador.</p></div>
-            <div class="form-group full"><label>Categorías de tickets</label><textarea id="setTicketCategories" rows="4" placeholder="Mantención&#10;Postventa&#10;Seguridad"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Una categoría por línea. Estas categorías aparecen en el formulario, filtros, reportes y envío al Mayordomo.</p></div>
-            <div class="form-group full"><label>Correo Mayordomo (segundo trigger)</label><input type="email" id="setMayordomoEmail" placeholder="angelfrias1993@gmail.com"><p class="ticket-hint" style="margin:.35rem 0 0">Los tickets de las categorías seleccionadas se enviarán al trigger <code>Mayordomo</code>.</p></div>
-            <div class="form-group full"><label>Categorías que recibe Mayordomo</label><textarea id="setMayordomoCategories" rows="4" placeholder="Mantención&#10;Conserjería&#10;Emergencias"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Escribe una categoría por línea. Si queda vacío, no se envían tickets al segundo trigger.</p></div>
+            <div class="admin-settings-grid">
+              <div class="settings-panel">
+                <div class="settings-panel-title">Categorías de tickets</div>
+                <p class="settings-panel-subtitle">Agrega o elimina categorías del formulario. Marca cuáles debe recibir el Mayordomo.</p>
+                <input type="hidden" id="setTicketCategories">
+                <input type="hidden" id="setMayordomoCategories">
+                <div class="category-add-row">
+                  <input type="text" id="newTicketCategoryName" placeholder="Nueva categoría, ej. Ascensores">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btnAddTicketCategory">Agregar</button>
+                </div>
+                <div class="category-list" id="ticketCategoryManager"></div>
+              </div>
+              <div class="settings-panel">
+                <div class="settings-panel-title">Correos de avisos</div>
+                <p class="settings-panel-subtitle">El administrador recibe todos los tickets. El Mayordomo recibe solo las categorías marcadas.</p>
+                <div class="form-group"><label>Administrador principal</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" readonly required></div>
+                <div class="form-group"><label>Correo en copia (opcional)</label><input type="email" id="setNotifyCcEmail" placeholder="opcional@entrecerros.cl"></div>
+                <div class="form-group"><label>Correo Mayordomo</label><input type="email" id="setMayordomoEmail" placeholder="angelfrias1993@gmail.com"></div>
+                <p class="admin-simple-note">El segundo trigger usa la colección <code>Mayordomo</code>. No necesitas configurar reglas manuales.</p>
+              </div>
+            </div>
             <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"></div>
             <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en Firebase Trigger Email"></div>
             <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="conserjeria.wm815@gmail.com"></div>
-            <div class="form-group"><label>Contraseña de aplicación Google</label><input type="password" id="setSmtpAppPassword" placeholder="Configurada en la extensión Trigger Email" autocomplete="new-password" readonly></div>
-            <div class="form-group full"><label>URI SMTP (extensión Firebase)</label><input type="text" id="setSmtpConnectionUri" readonly placeholder="smtps://usuario:***@smtp.gmail.com:465"></div>
-            <div class="form-group"><label>Colección de correo</label><input type="text" id="setMailCollection" value="mail" readonly></div>
-            <div class="form-group"><label>Autenticación SMTP</label><input type="text" id="setSmtpAuthType" value="Username &amp; Password" readonly></div>
-            <div class="form-group"><label>Puerto / TLS</label><input type="text" id="setSmtpPort" value="465 (smtps, seguro)" readonly></div>
-            <div class="form-group"><label>TTL documentos mail</label><input type="text" id="setFirestoreTtl" value="Never" readonly></div>
+            <div class="form-group admin-technical"><label>Contraseña de aplicación Google</label><input type="password" id="setSmtpAppPassword" placeholder="Configurada en la extensión Trigger Email" autocomplete="new-password" readonly></div>
+            <div class="form-group full admin-technical"><label>URI SMTP (extensión Firebase)</label><input type="text" id="setSmtpConnectionUri" readonly placeholder="smtps://usuario:***@smtp.gmail.com:465"></div>
+            <div class="form-group admin-technical"><label>Colección de correo</label><input type="text" id="setMailCollection" value="mail" readonly></div>
+            <div class="form-group admin-technical"><label>Autenticación SMTP</label><input type="text" id="setSmtpAuthType" value="Username &amp; Password" readonly></div>
+            <div class="form-group admin-technical"><label>Puerto / TLS</label><input type="text" id="setSmtpPort" value="465 (smtps, seguro)" readonly></div>
+            <div class="form-group admin-technical"><label>TTL documentos mail</label><input type="text" id="setFirestoreTtl" value="Never" readonly></div>
             <input type="hidden" id="setTicketEmailMode" value="extension">
-            <p id="smtpConfigStatus" class="ticket-hint" style="margin:0 0 .5rem"></p>
-            <p class="ticket-hint" style="margin:0 0 .75rem">Al crear ticket se escribe <code>mail/TK-…</code> en la base <strong>chatbotentrecerros</strong>. Trigger Email envía el aviso al administrador <strong>conserjeria.wm815@gmail.com</strong>.</p>
+            <p id="smtpConfigStatus" class="ticket-hint admin-technical" style="margin:0 0 .5rem"></p>
+            <p class="ticket-hint admin-technical" style="margin:0 0 .75rem">Al crear ticket se escribe <code>mail/TK-…</code> en la base <strong>chatbotentrecerros</strong>. Trigger Email envía el aviso al administrador <strong>conserjeria.wm815@gmail.com</strong>.</p>
             <div class="form-group full" style="display:flex;gap:.5rem;flex-wrap:wrap">
-              <button type="button" class="btn btn-secondary btn-sm" id="btnVerifyTicketEmail">Verificar correo</button>
-              <button type="button" class="btn btn-secondary btn-sm" id="btnDiagnoseTriggerEmail">Diagnóstico Trigger Email</button>
+              <button type="button" class="btn btn-secondary btn-sm admin-technical" id="btnVerifyTicketEmail">Verificar correo</button>
+              <button type="button" class="btn btn-secondary btn-sm admin-technical" id="btnDiagnoseTriggerEmail">Diagnóstico Trigger Email</button>
               <button type="submit" class="btn btn-primary"><span data-icon="save" data-icon-size="sm"></span> Guardar Configuración</button>
             </div>
           </form>
-          <div class="firebase-config-card">
+          <div class="firebase-config-card admin-technical">
             <h3>Firebase Cloud</h3>
             <p>Proyecto <strong>chatbostentrecerros</strong>. Firestore: base <strong>chatbotentrecerros</strong> · región <strong>Santiago (southamerica-west1)</strong>. Cola de correo: colección raíz <strong>mail/</strong> procesada por la extensión <strong>Trigger Email</strong>.</p>
             <form id="firebaseConfigForm" class="form-grid">
@@ -5840,6 +5870,7 @@ const SettingsModule = {
     const mayordomoRoute = getMayordomoRoute(s);
     set('setMayordomoEmail', mayordomoRoute?.to?.[0] || s.mayordomoEmail || MAYORDOMO_EMAIL_DEFAULT, 'value');
     set('setMayordomoCategories', (mayordomoRoute?.categories || []).filter((cat) => cat !== '*').join('\n'), 'value');
+    this.renderTicketCategoryManager();
     set('setPublicAppUrl', resolvePublicAppUrl(), 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL, 'value');
     set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
@@ -5866,6 +5897,81 @@ const SettingsModule = {
     const s = database.settings;
     document.getElementById('settingsPreview').innerHTML =
       `<div class="sidebar-logo">${renderLogoContent(s.logo)}</div><div><strong>${s.buildingName}</strong><br><span style="color:var(--text-muted);font-size:.85rem">${s.botName} — ${s.welcomeMessage.substring(0,80)}...</span></div>`;
+  },
+  getFormCategories() {
+    const hidden = document.getElementById('setTicketCategories');
+    const source = hidden?.value || getTicketCategories().join('\n');
+    return [...new Set(String(source).split(/\n+/).map((cat) => cat.trim()).filter(Boolean))];
+  },
+  getFormMayordomoCategories() {
+    const hidden = document.getElementById('setMayordomoCategories');
+    return [...new Set(String(hidden?.value || '').split(/\n+/).map((cat) => cat.trim()).filter(Boolean))];
+  },
+  syncCategoryHiddenFields(categories, mayordomoCategories) {
+    const cleanCategories = [...new Set((categories || []).map((cat) => String(cat || '').trim()).filter(Boolean))];
+    const allowed = new Set(cleanCategories.map((cat) => cat.toLowerCase()));
+    const cleanMayordomo = [...new Set((mayordomoCategories || []).map((cat) => String(cat || '').trim()).filter(Boolean))]
+      .filter((cat) => allowed.has(cat.toLowerCase()));
+    const catsEl = document.getElementById('setTicketCategories');
+    const mayEl = document.getElementById('setMayordomoCategories');
+    if (catsEl) catsEl.value = cleanCategories.join('\n');
+    if (mayEl) mayEl.value = cleanMayordomo.join('\n');
+    return { categories: cleanCategories, mayordomoCategories: cleanMayordomo };
+  },
+  renderTicketCategoryManager() {
+    const container = document.getElementById('ticketCategoryManager');
+    if (!container) return;
+    const { categories, mayordomoCategories } = this.syncCategoryHiddenFields(
+      this.getFormCategories(),
+      this.getFormMayordomoCategories()
+    );
+    const mayordomoSet = new Set(mayordomoCategories.map((cat) => cat.toLowerCase()));
+    container.innerHTML = categories.length ? categories.map((cat) => {
+      const checked = mayordomoSet.has(cat.toLowerCase()) ? 'checked' : '';
+      const disabled = categories.length <= 1 ? 'disabled' : '';
+      return `<div class="category-item" data-category="${escapeHtml(cat)}">
+        <div class="category-name">${escapeHtml(cat)}</div>
+        <label class="category-mayordomo"><input type="checkbox" data-mayordomo-category="${escapeHtml(cat)}" ${checked}> Mayordomo</label>
+        <button type="button" class="btn btn-danger btn-sm" data-remove-ticket-category="${escapeHtml(cat)}" ${disabled}>Eliminar</button>
+      </div>`;
+    }).join('') : '<div class="empty-state">Agrega al menos una categoría</div>';
+  },
+  addTicketCategoryFromInput() {
+    const input = document.getElementById('newTicketCategoryName');
+    const name = String(input?.value || '').trim();
+    if (!name) {
+      toast('Escribe el nombre de la categoría', 'warning');
+      return;
+    }
+    const categories = this.getFormCategories();
+    if (categories.some((cat) => cat.toLowerCase() === name.toLowerCase())) {
+      toast('Esa categoría ya existe', 'warning');
+      return;
+    }
+    categories.push(name);
+    this.syncCategoryHiddenFields(categories, this.getFormMayordomoCategories());
+    if (input) input.value = '';
+    this.renderTicketCategoryManager();
+  },
+  removeTicketCategory(name) {
+    const categories = this.getFormCategories();
+    if (categories.length <= 1) {
+      toast('Debe existir al menos una categoría', 'warning');
+      return;
+    }
+    const nextCategories = categories.filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
+    const nextMayordomo = this.getFormMayordomoCategories().filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
+    this.syncCategoryHiddenFields(nextCategories, nextMayordomo);
+    this.renderTicketCategoryManager();
+  },
+  toggleMayordomoCategory(name, enabled) {
+    const current = this.getFormMayordomoCategories();
+    const exists = current.some((cat) => cat.toLowerCase() === String(name).toLowerCase());
+    const next = enabled && !exists
+      ? [...current, name]
+      : current.filter((cat) => cat.toLowerCase() !== String(name).toLowerCase());
+    this.syncCategoryHiddenFields(this.getFormCategories(), next);
+    this.renderTicketCategoryManager();
   },
   /** Vista previa del portal principal */
   renderPortalPreview(fromForm = false) {
@@ -5973,6 +6079,25 @@ const SettingsModule = {
     document.getElementById('settingsForm').addEventListener('submit', e => this.save(e));
     ['setBuildingName', 'setLogo', 'setPortalTagline', 'setPortalHint'].forEach(id => {
       document.getElementById(id)?.addEventListener('input', () => this.renderPortalPreview(true));
+    });
+    document.getElementById('btnAddTicketCategory')?.addEventListener('click', () => this.addTicketCategoryFromInput());
+    document.getElementById('newTicketCategoryName')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.addTicketCategoryFromInput();
+      }
+    });
+    document.getElementById('ticketCategoryManager')?.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-remove-ticket-category]');
+      if (removeBtn) {
+        this.removeTicketCategory(removeBtn.dataset.removeTicketCategory);
+      }
+    });
+    document.getElementById('ticketCategoryManager')?.addEventListener('change', (e) => {
+      const check = e.target.closest('[data-mayordomo-category]');
+      if (check) {
+        this.toggleMayordomoCategory(check.dataset.mayordomoCategory, check.checked);
+      }
     });
     const tt = document.getElementById('themeToggle');
     if (tt) tt.addEventListener('click', () => this.toggleTheme());
@@ -11123,7 +11248,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v43-fixed-admin-optional-cc';",
+    "const CACHE_NAME='arturito-ai-v44-admin-clean-categories';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
