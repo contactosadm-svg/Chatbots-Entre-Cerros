@@ -1221,8 +1221,8 @@ body.mode-client #adminApp{display:none!important}
               <div style="font-weight:700;margin-bottom:.75rem;font-size:.95rem">Notificaciones por correo (tickets)</div>
             </div>
             <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="administracion@entrecerros.cl" required></div>
-            <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://chatbots-entre-cerros.web.app"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
-            <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://chatbots-entre-cerros.web.app/admin"></div>
+            <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
+            <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"></div>
             <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en Firebase Trigger Email"></div>
             <div class="form-group"><label>Responder a REPLY-TO</label><input type="email" id="setSmtpReplyTo" placeholder="administracion@entrecerros.cl" readonly></div>
             <div class="form-group"><label>Contraseña de aplicación Google</label><input type="password" id="setSmtpAppPassword" placeholder="Configurada en la extensión Trigger Email" autocomplete="new-password" readonly></div>
@@ -1556,7 +1556,7 @@ const ARTURITO_GADGET_CATEGORIES = {
     smtpFromEmail: 'conserjeria.wm815@gmail.com',
     smtpReplyTo: 'conserjeria.wm815@gmail.com',
     notifyAdminEmail: 'conserjeria.wm815@gmail.com',
-    publicAppUrl: 'https://chatbots-entre-cerros.web.app',
+    publicAppUrl: 'https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/',
     smtpPort: 465,
     smtpSecure: true,
     firestoreTtlType: 'Never',
@@ -2840,11 +2840,27 @@ const ARTURITO_GADGET_CATEGORIES = {
       return true;
     }
 
+    async pullTicketsData(database, forceServer = true) {
+      if (!this.fb.isEnabled()) return false;
+      const { getDocs, getDocsFromServer } = this.fb._modules;
+      let snap = null;
+      if (forceServer && getDocsFromServer) {
+        try { snap = await getDocsFromServer(this.fb.col('tickets')); } catch (_) {}
+      }
+      if (!snap) snap = await getDocs(this.fb.col('tickets'));
+      const remote = snap.docs
+        .map((d) => this.tickets.mapToLocal(d.data(), d.id))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      if (JSON.stringify(remote) === JSON.stringify(database.tickets || [])) return false;
+      database.tickets = remote;
+      return true;
+    }
+
     /** Descarga KB y settings públicos desde el servidor (sin caché) */
     async pullPublicCloudData(database, forceServer = true) {
-      if (!this.fb.isEnabled()) return { settings: false, gadgetKB: false, knowledge: false, analytics: false, training: false };
+      if (!this.fb.isEnabled()) return { settings: false, gadgetKB: false, knowledge: false, analytics: false, training: false, tickets: false };
       const { getDoc, getDocFromServer, getDocs, getDocsFromServer } = this.fb._modules;
-      const changes = { settings: false, gadgetKB: false, knowledge: false, analytics: false, training: false };
+      const changes = { settings: false, gadgetKB: false, knowledge: false, analytics: false, training: false, tickets: false };
       const settingsRef = this.fb.doc(`condominios/${this._cid()}/settings/main`);
       try {
         let settingsSnap = null;
@@ -2896,6 +2912,7 @@ const ARTURITO_GADGET_CATEGORIES = {
           this.applyUnifiedKnowledge(database);
         }
         if (this.auth?.isStaff?.(this.auth.currentUser) && await this.pullChatInteractions(database, forceServer)) changes.analytics = true;
+        if (await this.pullTicketsData(database, forceServer)) changes.tickets = true;
         if (await this.pullTrainingData(forceServer)) changes.training = true;
       } catch (err) {
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
@@ -3009,7 +3026,7 @@ const ARTURITO_GADGET_CATEGORIES = {
         gadgetCategoryOrder: Array.isArray(s.gadgetCategoryOrder) ? s.gadgetCategoryOrder.slice() : [],
         notifyAdminEmail: s.notifyAdminEmail || defs.notifyAdminEmail || '',
         publicAppUrl: s.publicAppUrl || DEFAULT_PUBLIC_APP_URL,
-        adminPanelUrl: s.adminPanelUrl || 'https://chatbots-entre-cerros.web.app/admin',
+        adminPanelUrl: s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL,
         smtpFromEmail: s.smtpFromEmail || defs.smtpFromEmail || '',
         smtpReplyTo: s.smtpReplyTo || defs.smtpReplyTo || '',
         mailCollection: s.mailCollection || defs.mailCollection || 'mail',
@@ -3305,7 +3322,7 @@ const ARTURITO_GADGET_CATEGORIES = {
 
     bindTicketsWatch(database, onUpdate) {
       this.stopTicketsWatch();
-      if (!this.fb.isEnabled() || !this.fb.auth?.currentUser) return;
+      if (!this.fb.isEnabled()) return;
 
       void this.tickets.syncCounterFromExisting();
 
@@ -3628,6 +3645,7 @@ const ARTURITO_GADGET_CATEGORIES = {
       if (changes.gadgetKB && onSync) { onSync('gadgetKB'); synced = true; }
       if (changes.knowledge && onSync) { onSync('knowledge'); synced = true; }
       if (changes.analytics && onSync) { onSync('analytics'); synced = true; }
+      if (changes.tickets && onSync) { onSync('tickets'); synced = true; }
       if (changes.training && onSync) { onSync('training'); synced = true; }
       return synced;
     }
@@ -4033,7 +4051,7 @@ const DatabaseModule = {
         theme: 'light',
         notifyAdminEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
         publicAppUrl: DEFAULT_PUBLIC_APP_URL,
-        adminPanelUrl: 'https://chatbots-entre-cerros.web.app/admin',
+        adminPanelUrl: DEFAULT_PUBLIC_APP_URL,
         smtpConnectionUri: '',
         smtpFromEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpFromEmail,
         smtpReplyTo: ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpReplyTo,
@@ -4056,7 +4074,7 @@ const DatabaseModule = {
       adminKey:'admin123', theme:'light',
       notifyAdminEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
       publicAppUrl: DEFAULT_PUBLIC_APP_URL,
-      adminPanelUrl:'https://chatbots-entre-cerros.web.app/admin',
+      adminPanelUrl:DEFAULT_PUBLIC_APP_URL,
       smtpConnectionUri:'',
       smtpFromEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpFromEmail,
       smtpReplyTo:ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpReplyTo,
@@ -5698,7 +5716,7 @@ const SettingsModule = {
     const defs = window.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
     set('setNotifyAdminEmail', s.notifyAdminEmail || defs.notifyAdminEmail || '', 'value');
     set('setPublicAppUrl', resolvePublicAppUrl(), 'value');
-    set('setAdminPanelUrl', s.adminPanelUrl || 'https://chatbots-entre-cerros.web.app/admin', 'value');
+    set('setAdminPanelUrl', s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL, 'value');
     set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
     set('setMailCollection', s.mailCollection || defs.mailCollection || 'mail', 'value');
     const authEl = document.getElementById('setSmtpAuthType');
@@ -5758,7 +5776,7 @@ const SettingsModule = {
       toast('Indica el correo del administrador para recibir tickets', 'warning');
       return;
     }
-    database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || 'https://chatbots-entre-cerros.web.app/admin';
+    database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || DEFAULT_PUBLIC_APP_URL;
     database.settings.publicAppUrl = resolvePublicAppUrl();
     database.settings.smtpReplyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || database.settings.smtpReplyTo || '';
     database.settings.mailCollection = document.getElementById('setMailCollection')?.value.trim() || 'mail';
@@ -7656,7 +7674,7 @@ const ChatModule = {
 };
 
 /* URL pública del chat residente — SIEMPRE usada en botones de correo */
-const DEFAULT_PUBLIC_APP_URL = 'https://chatbots-entre-cerros.web.app';
+const DEFAULT_PUBLIC_APP_URL = 'https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/';
 
 function resolvePublicAppUrl() {
   return DEFAULT_PUBLIC_APP_URL;
@@ -8163,7 +8181,7 @@ const TicketEmailDebug = {
   buildTicketEmailPayload(ticketId, ticket, settings) {
     const s = settings || database.settings || {};
     const buildingName = s.buildingName || 'Edificio';
-    const adminPanelUrl = s.adminPanelUrl || 'https://chatbots-entre-cerros.web.app/admin';
+    const adminPanelUrl = s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL;
     const condominioId = typeof ArturitoCloud !== 'undefined' ? ArturitoCloud.fb.getCondominioId() : 'entre-cerros';
     const esc = (v) => this._escapeHtml(v);
     const adjuntos = (ticket.attachments || ticket.adjuntos || []).map((a) => ({
@@ -10889,7 +10907,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v38-globalthis-mail';",
+    "const CACHE_NAME='arturito-ai-v40-cloud-ticket-sync';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
@@ -10961,6 +10979,11 @@ const App = {
         TicketModule.render();
         ReportModule.render();
         AdminModule.render();
+      }
+      const activeTicket = TicketLookupModule?._currentTicket?.id;
+      if (activeTicket) {
+        const fresh = database.tickets.find((t) => t.id === activeTicket);
+        if (fresh) TicketLookupModule._currentTicket = fresh;
       }
     } else if (this.mode === 'admin') {
       AdminModule.render();
