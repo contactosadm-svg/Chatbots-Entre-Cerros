@@ -2437,9 +2437,9 @@ const ARTURITO_GADGET_KB_SEED = [
     smtpAuthType: 'UsernamePassword',
     smtpAuthTypeLabel: 'Username & Password',
     smtpConnectionUri: '',
-    smtpFromEmail: '',
-    smtpReplyTo: '',
-    notifyAdminEmail: '',
+    smtpFromEmail: 'conserjeria.wm815@gmail.com',
+    smtpReplyTo: 'conserjeria.wm815@gmail.com',
+    notifyAdminEmail: 'conserjeria.wm815@gmail.com',
     publicAppUrl: 'https://kike01f.github.io/Chatbots-Entre-Cerros',
     smtpPort: 465,
     smtpSecure: true,
@@ -2565,7 +2565,7 @@ const ARTURITO_GADGET_KB_SEED = [
       }
       try {
         this._modules = await loadFirebaseModules();
-        const { initializeApp, getApps, getApp, deleteApp, getAuth, getFirestore, getStorage } = this._modules;
+        const { initializeApp, getApps, getApp, deleteApp, getAuth, initializeFirestore, getFirestore, getStorage } = this._modules;
         const appKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
         const sameFirebaseApp = (app) => appKeys.every((key) =>
           String(app?.options?.[key] || '') === String(config?.[key] || '')
@@ -2582,7 +2582,18 @@ const ARTURITO_GADGET_KB_SEED = [
         }
         this.auth = getAuth(this.app);
         const dbId = config.firestoreDatabaseId || '(default)';
-        this.db = getFirestore(this.app, dbId);
+        const firestoreSettings = {
+          experimentalForceLongPolling: true,
+          useFetchStreams: false,
+          ignoreUndefinedProperties: true
+        };
+        try {
+          this.db = initializeFirestore
+            ? initializeFirestore(this.app, firestoreSettings, dbId)
+            : getFirestore(this.app, dbId);
+        } catch (_) {
+          this.db = getFirestore(this.app, dbId);
+        }
         this.storage = getStorage(this.app);
         this.enabled = true;
         this.condominioId = config.condominioId || DEFAULT_FIREBASE_CONFIG.condominioId || 'entre-cerros';
@@ -2655,9 +2666,10 @@ const ARTURITO_GADGET_KB_SEED = [
     }
 
     async loadProfile(uid) {
-      const { getDoc } = this.fb._modules;
+      const { getDoc, getDocFromServer } = this.fb._modules;
       try {
-        const snap = await getDoc(this.fb.doc(`users/${uid}`));
+        const ref = this.fb.doc(`users/${uid}`);
+        const snap = getDocFromServer ? await getDocFromServer(ref) : await getDoc(ref);
         return snap.exists() ? snap.data() : null;
       } catch (err) {
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
@@ -3780,7 +3792,7 @@ const ARTURITO_GADGET_KB_SEED = [
     /** Garantiza notifyAdminEmail en Firestore (la Function lo necesita al crear tickets) */
     async ensureTicketEmailSettings(database) {
       if (!this.fb.isEnabled()) return false;
-      const { getDoc, setDoc } = this.fb._modules;
+      const { getDoc, getDocFromServer, setDoc } = this.fb._modules;
       const ref = this.fb.doc(`condominios/${this._cid()}/settings/main`);
       database.settings = database.settings || {};
       if (global.DatabaseModule?.ensureDefaults) {
@@ -3788,7 +3800,7 @@ const ARTURITO_GADGET_KB_SEED = [
       }
       let remote = {};
       try {
-        const snap = await getDoc(ref);
+        const snap = getDocFromServer ? await getDocFromServer(ref) : await getDoc(ref);
         if (snap.exists()) remote = snap.data() || {};
       } catch (err) {
         const denied = err?.code === 'permission-denied' || /permission/i.test(String(err.message || err));
@@ -4146,10 +4158,10 @@ const ARTURITO_GADGET_KB_SEED = [
     _snapErr(label) {
       return (err) => {
         if (err?.code === 'permission-denied') {
-          console.warn('[CloudSync]', label, 'sin permiso');
+          console.info('[CloudSync]', label, 'no disponible para esta sesión');
           return;
         }
-        console.warn('[CloudSync]', label, err);
+        console.info('[CloudSync]', label, err?.message || err);
       };
     }
 
@@ -4470,9 +4482,15 @@ const ARTURITO_GADGET_KB_SEED = [
 
       this.sync.applyUnifiedKnowledge(database);
 
-      this.sync.startRealtimeSync(database, (type) => {
-        if (callbacks.onSync) callbacks.onSync(type);
-      });
+      const realtimeEnabled = database.settings?.enableRealtimeSync === true
+        || global.ARTURITO_ENABLE_REALTIME === true;
+      if (realtimeEnabled) {
+        this.sync.startRealtimeSync(database, (type) => {
+          if (callbacks.onSync) callbacks.onSync(type);
+        });
+      } else {
+        this.sync.stop();
+      }
 
       return {
         mode: 'cloud',
@@ -4878,12 +4896,12 @@ const DatabaseModule = {
         portalHint: 'Consulta horarios, gastos comunes, reservas o crea solicitudes.\n\nHaz clic en **Arturito** en la esquina inferior derecha.',
         adminKey: 'admin123',
         theme: 'light',
-        notifyAdminEmail: '',
+        notifyAdminEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
         publicAppUrl: DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: 'https://chatbots-entre-cerros.web.app/admin',
         smtpConnectionUri: '',
-        smtpFromEmail: '',
-        smtpReplyTo: '',
+        smtpFromEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpFromEmail,
+        smtpReplyTo: ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpReplyTo,
         mailCollection: 'mail',
         firestoreLocation: 'southamerica-west1',
         smtpAuthType: 'UsernamePassword',
@@ -4901,12 +4919,12 @@ const DatabaseModule = {
       portalTagline:'Tu asistente Arturito disponible 24/7',
       portalHint:'Consulta horarios, gastos comunes, reservas o crea solicitudes.\n\nHaz clic en **Arturito** en la esquina inferior derecha.',
       adminKey:'admin123', theme:'light',
-      notifyAdminEmail:'',
+      notifyAdminEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
       publicAppUrl: DEFAULT_PUBLIC_APP_URL,
       adminPanelUrl:'https://chatbots-entre-cerros.web.app/admin',
       smtpConnectionUri:'',
-      smtpFromEmail:'',
-      smtpReplyTo:'',
+      smtpFromEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpFromEmail,
+      smtpReplyTo:ARTURITO_FIREBASE_EMAIL_DEFAULTS.smtpReplyTo,
       mailCollection:'mail',
       firestoreLocation:'southamerica-west1',
       smtpAuthType:'UsernamePassword',
@@ -8550,10 +8568,10 @@ const TicketEmailDebug = {
     if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) {
       return { ok: false, error: 'Firebase no conectado' };
     }
-    const { getDoc } = ArturitoCloud.fb._modules;
+    const { getDoc, getDocFromServer } = ArturitoCloud.fb._modules;
     const cid = ArturitoCloud.fb.getCondominioId();
     const ref = ArturitoCloud.fb.doc(`condominios/${cid}/settings/main`);
-    const snap = await getDoc(ref);
+    const snap = getDocFromServer ? await getDocFromServer(ref) : await getDoc(ref);
     return { ok: true, exists: snap.exists(), data: snap.exists() ? snap.data() : {}, cid };
   },
   async ensureExtensionModeInCloud() {
@@ -8745,8 +8763,9 @@ const TicketEmailDebug = {
   async fetchMailStatus(ticketId) {
     if (!ticketId || typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) return null;
     try {
-      const { doc, getDoc } = ArturitoCloud.fb._modules;
-      const snap = await getDoc(doc(ArturitoCloud.fb.db, 'mail', ticketId));
+      const { doc, getDoc, getDocFromServer } = ArturitoCloud.fb._modules;
+      const ref = doc(ArturitoCloud.fb.db, 'mail', ticketId);
+      const snap = getDocFromServer ? await getDocFromServer(ref) : await getDoc(ref);
       if (!snap.exists()) {
         this._mailCache[ticketId] = null;
         return null;
@@ -8764,14 +8783,14 @@ const TicketEmailDebug = {
   async loadMailLogs(ticketId) {
     if (!ticketId || typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) return [];
     try {
-      const { collection, query, where, orderBy, limit, getDocs } = ArturitoCloud.fb._modules;
+      const { collection, query, where, orderBy, limit, getDocs, getDocsFromServer } = ArturitoCloud.fb._modules;
       const q = query(
         collection(ArturitoCloud.fb.db, 'logs', 'mail', 'entries'),
         where('ticketId', '==', ticketId),
         orderBy('createdAt', 'desc'),
         limit(10)
       );
-      const snap = await getDocs(q);
+      const snap = getDocsFromServer ? await getDocsFromServer(q) : await getDocs(q);
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch (err) {
       console.info('[TicketEmail] Historial de correo no disponible:', err?.message || err);
@@ -9018,17 +9037,20 @@ const TicketEmailDebug = {
       throw new Error('Firebase no conectado');
     }
     const settingsSnap = await this.readCloudSettings();
-    const settings = settingsSnap.ok ? { ...database.settings, ...(settingsSnap.data || {}) } : database.settings;
-    const recipients = this._parseEmails(settings?.notifyAdminEmail);
+    const defaults = global.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
+    const settings = settingsSnap.ok
+      ? { ...defaults, ...database.settings, ...(settingsSnap.data || {}) }
+      : { ...defaults, ...(database.settings || {}) };
+    const recipients = this._parseEmails(settings?.notifyAdminEmail || defaults.notifyAdminEmail);
     const to = recipients.length ? recipients : [];
     if (!to.length) {
       throw new Error('Falta configurar el correo del administrador de Entre Cerros');
     }
     const email = this.buildTicketEmailPayload(ticketId, ticket, settings);
     const replyTo = ticket.email || settings?.smtpReplyTo || to[0];
-    const { doc, getDoc, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
+    const { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
     const mailRef = doc(ArturitoCloud.fb.db, 'mail', ticketId);
-    const existing = await getDoc(mailRef);
+    const existing = getDocFromServer ? await getDocFromServer(mailRef) : await getDoc(mailRef);
     if (existing.exists()) {
       this.log('mail/ ya existe para este ticket', {
         mailId: ticketId,
@@ -9073,9 +9095,9 @@ const TicketEmailDebug = {
     if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) return null;
     const settings = settingsIn || database.settings || {};
     const mailId = this.clientMailId(ticketId);
-    const { doc, getDoc, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
+    const { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
     const mailRef = doc(ArturitoCloud.fb.db, 'mail', mailId);
-    const existing = await getDoc(mailRef);
+    const existing = getDocFromServer ? await getDocFromServer(mailRef) : await getDoc(mailRef);
     if (existing.exists()) {
       this.log('Confirmación residente ya encolada', { path: `mail/${mailId}` });
       return mailId;
@@ -9105,14 +9127,14 @@ const TicketEmailDebug = {
   /** Espera delivery (Trigger Email) y muestra toast al usuario */
   async watchMailDelivery(mailId, maxAttempts = 15, notifyUser = false) {
     if (!mailId || typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) return;
-    const { doc, getDoc } = ArturitoCloud.fb._modules;
+    const { doc, getDoc, getDocFromServer } = ArturitoCloud.fb._modules;
     const ref = doc(ArturitoCloud.fb.db, 'mail', mailId);
     const dbId = ArturitoCloud.fb.getFirestoreDatabaseId?.() || '(default)';
     this.log('Esperando Trigger Email…', { mailId, database: dbId });
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const snap = await getDoc(ref);
+        const snap = getDocFromServer ? await getDocFromServer(ref) : await getDoc(ref);
         if (!snap.exists()) continue;
         const data = snap.data() || {};
         this._mailCache[mailId] = data;
@@ -11676,7 +11698,7 @@ function registerArturitoServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   var scope = location.pathname.replace(/[^/]*$/, '') || '/';
   var swCode = [
-    "const CACHE_NAME='arturito-ai-v21-email-chat-url';",
+    "const CACHE_NAME='arturito-ai-v23-ticket-email';",
     "self.addEventListener('install',function(e){",
     "var SCOPE=self.registration.scope;",
     "var OFFLINE=[",
