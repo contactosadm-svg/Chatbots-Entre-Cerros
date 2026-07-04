@@ -3177,6 +3177,7 @@ const ARTURITO_GADGET_CATEGORIES = {
         },
         updatedAt: Date.now()
       };
+      ensureTicketEmailRoutingDefaults(payload);
       return JSON.parse(JSON.stringify(payload));
     }
 
@@ -3971,7 +3972,10 @@ const ARTURITO_GADGET_CATEGORIES = {
 
 const STORAGE_KEY = 'arturito_ai_database';
 const BACKUP_PREFIX = 'arturito_ai_backup_';
-const DEFAULT_TICKET_CATEGORIES = ['Mantención','Postventa','Seguridad','Conserjería','Mudanzas','Gastos Comunes','Reclamos','Emergencias'];
+const TAG_TICKET_CATEGORY = 'TAG';
+const DEFAULT_TICKET_CATEGORIES = ['Mantención','Postventa','Seguridad',TAG_TICKET_CATEGORY,'Conserjería','Mudanzas','Gastos Comunes','Reclamos','Emergencias'];
+const DEFAULT_MAYORDOMO_CATEGORIES = [TAG_TICKET_CATEGORY];
+const DEFAULT_ADMIN_EXCLUDED_CATEGORIES = [TAG_TICKET_CATEGORY];
 const CATEGORIES = DEFAULT_TICKET_CATEGORIES;
 const MAYORDOMO_EMAIL_DEFAULT = 'angelfrias1993@gmail.com';
 const MAYORDOMO_COLLECTION = 'Mayordomo';
@@ -4025,7 +4029,31 @@ function getTicketCategories() {
   const configured = Array.isArray(database.settings?.ticketCategories)
     ? database.settings.ticketCategories.map((c) => String(c || '').trim()).filter(Boolean)
     : [];
-  return configured.length ? [...new Set(configured)] : DEFAULT_TICKET_CATEGORIES.slice();
+  const categories = configured.length ? configured : DEFAULT_TICKET_CATEGORIES;
+  return mergeCategoryLists(categories, DEFAULT_MAYORDOMO_CATEGORIES);
+}
+function mergeCategoryLists(...lists) {
+  const byKey = new Map();
+  lists.flat().forEach((cat) => {
+    const name = String(cat || '').trim();
+    if (!name) return;
+    const key = normalizeCategoryKey(name);
+    if (!byKey.has(key)) byKey.set(key, name);
+  });
+  return [...byKey.values()];
+}
+function hasTagRequestText(value) {
+  const text = normalizeCategoryKey(value);
+  return /\btag\b/.test(text)
+    || /\btelepeaje\b/.test(text)
+    || /\bcontrol vehicular\b/.test(text)
+    || /\bacceso vehicular\b/.test(text);
+}
+function resolveTicketMailCategory(ticket) {
+  const current = String(ticket?.categoria || ticket?.asunto || '').trim();
+  if (normalizeCategoryKey(current) === normalizeCategoryKey(TAG_TICKET_CATEGORY)) return TAG_TICKET_CATEGORY;
+  const text = [current, ticket?.descripcion, ticket?.asunto].filter(Boolean).join(' ');
+  return hasTagRequestText(text) ? TAG_TICKET_CATEGORY : current;
 }
 function parseEmailList(raw) {
   return String(raw || '').split(/[,;]/).map((email) => email.trim()).filter(Boolean);
@@ -4092,6 +4120,32 @@ function formatEmailRoutingRules(routes = []) {
     (route.cc || []).join(', '),
     route.collection || 'mail'
   ].join(' | ')).join('\n');
+}
+function ensureTicketEmailRoutingDefaults(settings = {}) {
+  settings.ticketCategories = mergeCategoryLists(settings.ticketCategories || DEFAULT_TICKET_CATEGORIES, DEFAULT_MAYORDOMO_CATEGORIES);
+  settings.adminExcludedCategories = mergeCategoryLists(settings.adminExcludedCategories || [], DEFAULT_ADMIN_EXCLUDED_CATEGORIES)
+    .filter((cat) => settings.ticketCategories.some((ticketCat) => normalizeCategoryKey(ticketCat) === normalizeCategoryKey(cat)));
+
+  const mayordomoEmail = settings.mayordomoEmail || MAYORDOMO_EMAIL_DEFAULT;
+  const routes = settings.emailRouting && Array.isArray(settings.emailRouting.routes)
+    ? settings.emailRouting.routes.map((route) => ({ ...route, categories: Array.isArray(route.categories) ? route.categories.slice() : [] }))
+    : [];
+  const mayordomoIndex = routes.findIndex((route) => String(route.collection || '') === MAYORDOMO_COLLECTION || route.id === 'mayordomo');
+  if (mayordomoIndex >= 0) {
+    routes[mayordomoIndex] = {
+      ...routes[mayordomoIndex],
+      id: routes[mayordomoIndex].id || 'mayordomo',
+      categories: mergeCategoryLists(routes[mayordomoIndex].categories, DEFAULT_MAYORDOMO_CATEGORIES)
+        .filter((cat) => settings.ticketCategories.some((ticketCat) => normalizeCategoryKey(ticketCat) === normalizeCategoryKey(cat))),
+      to: Array.isArray(routes[mayordomoIndex].to) && routes[mayordomoIndex].to.length ? routes[mayordomoIndex].to : [mayordomoEmail],
+      cc: Array.isArray(routes[mayordomoIndex].cc) ? routes[mayordomoIndex].cc : [],
+      collection: MAYORDOMO_COLLECTION
+    };
+  } else {
+    routes.unshift(buildMayordomoRouting(mayordomoEmail, DEFAULT_MAYORDOMO_CATEGORIES)[0]);
+  }
+  settings.emailRouting = { enabled: settings.emailRouting?.enabled !== false, routes: routes.filter(Boolean) };
+  return settings;
 }
 /** Iconos SVG representativos (estilo lineal) */
 const IconSVG = {
@@ -4275,13 +4329,13 @@ const DatabaseModule = {
         notifyAdminEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
         notifyCcEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
         ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
-        adminExcludedCategories: [],
+        adminExcludedCategories: DEFAULT_ADMIN_EXCLUDED_CATEGORIES.slice(),
         mayordomoEmail: MAYORDOMO_EMAIL_DEFAULT,
         emailRouting: {
           enabled: true,
           routes: [{
             id: 'mayordomo',
-            categories: DEFAULT_TICKET_CATEGORIES.slice(),
+            categories: DEFAULT_MAYORDOMO_CATEGORIES.slice(),
             to: [MAYORDOMO_EMAIL_DEFAULT],
             cc: [],
             collection: MAYORDOMO_COLLECTION
@@ -4312,13 +4366,13 @@ const DatabaseModule = {
       notifyAdminEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
       notifyCcEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
       ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
-      adminExcludedCategories: [],
+      adminExcludedCategories: DEFAULT_ADMIN_EXCLUDED_CATEGORIES.slice(),
       mayordomoEmail: MAYORDOMO_EMAIL_DEFAULT,
       emailRouting: {
         enabled: true,
         routes: [{
           id: 'mayordomo',
-          categories: DEFAULT_TICKET_CATEGORIES.slice(),
+          categories: DEFAULT_MAYORDOMO_CATEGORIES.slice(),
           to: [MAYORDOMO_EMAIL_DEFAULT],
           cc: [],
           collection: MAYORDOMO_COLLECTION
@@ -4341,6 +4395,7 @@ const DatabaseModule = {
       showTopicsOnWelcome: true
     };
     Object.keys(defaults).forEach(k => { if (database.settings[k] === undefined) database.settings[k] = defaults[k]; });
+    ensureTicketEmailRoutingDefaults(database.settings);
     if (!database.settings.chatShortcuts) {
       if (Array.isArray(database.settings.emojis) && database.settings.emojis.length) {
         database.settings.chatShortcuts = database.settings.emojis.map((text, i) => ({
@@ -6168,6 +6223,7 @@ const SettingsModule = {
       enabled: true,
       routes: buildMayordomoRouting(mayordomoEmail, mayordomoCategories)
     };
+    ensureTicketEmailRoutingDefaults(database.settings);
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || DEFAULT_PUBLIC_APP_URL;
     database.settings.publicAppUrl = resolvePublicAppUrl();
     const replyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || '';
@@ -8669,7 +8725,7 @@ const TicketEmailDebug = {
   },
   getCategoryEmailRoutes(settings, category) {
     const routes = settings?.emailRouting?.enabled === false ? [] : (settings?.emailRouting?.routes || []);
-      const current = normalizeCategoryKey(category);
+    const current = normalizeCategoryKey(category);
     return routes.filter((route) => {
       const cats = route.categories || [];
       return cats.includes('*') || cats.some((cat) => normalizeCategoryKey(cat) === current);
@@ -8680,7 +8736,8 @@ const TicketEmailDebug = {
     return (settings?.adminExcludedCategories || []).some((cat) => normalizeCategoryKey(cat) === current);
   },
   async queueCategoryRouteMails(ticketId, ticket, settings, email, replyTo) {
-    const routes = this.getCategoryEmailRoutes(settings, ticket.categoria || ticket.asunto);
+    const mailCategory = resolveTicketMailCategory(ticket);
+    const routes = this.getCategoryEmailRoutes(settings, mailCategory);
     if (!routes.length) return [];
     const { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
     const queued = [];
@@ -8708,7 +8765,7 @@ const TicketEmailDebug = {
           ticketId,
           condominioId: email.condominioId,
           source: 'app-category-route',
-          category: ticket.categoria || ticket.asunto || '',
+          category: mailCategory,
           routeId: route.id || routeKey,
           routeCollection: collection,
           database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros',
@@ -8730,6 +8787,7 @@ const TicketEmailDebug = {
     const settings = settingsSnap.ok
       ? { ...defaults, ...database.settings, ...(settingsSnap.data || {}) }
       : { ...defaults, ...(database.settings || {}) };
+    ensureTicketEmailRoutingDefaults(settings);
     const requiredAdmin = this._parseEmails(defaults.notifyAdminEmail || 'conserjeria.wm815@gmail.com')[0];
     const adminEmail = requiredAdmin;
     const to = adminEmail ? [adminEmail] : [];
@@ -8741,9 +8799,10 @@ const TicketEmailDebug = {
     const email = this.buildTicketEmailPayload(ticketId, ticket, settings);
     const replyTo = ticket.email || settings?.smtpReplyTo || to[0];
     const { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
-    const adminExcluded = this.isAdminExcludedCategory(settings, ticket.categoria || ticket.asunto);
+    const mailCategory = resolveTicketMailCategory(ticket);
+    const adminExcluded = this.isAdminExcludedCategory(settings, mailCategory);
     if (adminExcluded) {
-      this.log('Correo admin omitido por categoría', { ticketId, category: ticket.categoria || ticket.asunto });
+      this.log('Correo admin omitido por categoría', { ticketId, category: mailCategory, originalCategory: ticket.categoria || ticket.asunto });
       await this.queueCategoryRouteMails(ticketId, ticket, settings, email, replyTo);
       void this.queueClientConfirmationMail(ticketId, ticket, settings);
       return ticketId;
@@ -9952,6 +10011,7 @@ const TicketModule = {
       estado: editId ? document.getElementById('tEstado').value : 'Abierto',
       updatedAt: Date.now()
     };
+    if (resolveTicketMailCategory(data) === TAG_TICKET_CATEGORY) data.categoria = TAG_TICKET_CATEGORY;
     const submitBtn = document.querySelector('#ticketForm button[type="submit"]');
     if (submitBtn) submitBtn.disabled = true;
     try {
