@@ -1221,6 +1221,8 @@ body.mode-client #adminApp{display:none!important}
             </div>
             <div class="form-group full"><label>Correo del administrador *</label><input type="email" id="setNotifyAdminEmail" placeholder="conserjeria.wm815@gmail.com" readonly required><p class="ticket-hint" style="margin:.35rem 0 0">Destinatario principal fijo para avisos de nuevo ticket.</p></div>
             <div class="form-group full"><label>Correo en copia (CC)</label><input type="email" id="setNotifyCcEmail" placeholder="opcional@entrecerros.cl"><p class="ticket-hint" style="margin:.35rem 0 0">Opcional. Este correo recibe copia del aviso de nuevo ticket, no reemplaza al administrador.</p></div>
+            <div class="form-group full"><label>Categorías de tickets</label><textarea id="setTicketCategories" rows="4" placeholder="Mantención&#10;Postventa&#10;Seguridad"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Una categoría por línea. Estas categorías alimentan el formulario de tickets, filtros, reportes y canalización de correos.</p></div>
+            <div class="form-group full"><label>Canalización por categoría</label><textarea id="setEmailRoutingRules" rows="6" placeholder="Mantención | mantencion@entrecerros.cl | supervisor@entrecerros.cl | mail_mantencion&#10;Reclamos, Emergencias | reclamos@entrecerros.cl |  | mail_reclamos"></textarea><p class="ticket-hint" style="margin:.35rem 0 0">Formato: <code>Categoría(s) | correo(s) destino | CC opcional | colección trigger</code>. Usa <code>*</code> para todas las categorías. La colección debe comenzar con <code>mail</code>.</p></div>
             <div class="form-group full"><label>URL app residentes (consulta ticket · correos)</label><input type="url" id="setPublicAppUrl" readonly placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"><p class="ticket-hint" style="margin:.35rem 0 0">Todos los botones de correo al residente apuntan a esta página del chat.</p></div>
             <div class="form-group full"><label>URL del panel admin</label><input type="url" id="setAdminPanelUrl" placeholder="https://contactosadm-svg.github.io/Chatbots-Entre-Cerros/"></div>
             <div class="form-group"><label>Remitente FROM (SMTP)</label><input type="email" id="setSmtpGmail" placeholder="conserjeria.wm815@gmail.com" autocomplete="username" readonly title="Configurado en Firebase Trigger Email"></div>
@@ -2514,13 +2516,13 @@ const ARTURITO_GADGET_CATEGORIES = {
   const CLOUD_SETTINGS_KEYS = [
     'buildingName', 'logo', 'primaryColor', 'secondaryColor', 'botName',
     'welcomeMessage', 'portalTagline', 'portalHint', 'theme',
-    'notifyAdminEmail', 'notifyCcEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode',
     'quickQuestions', 'topicsMenuIntro', 'showTopicsOnWelcome',
     'chatShortcuts', 'chatMessages', 'gadgetCategories', 'gadgetCategoryOrder', 'chatAnalytics', 'updatedAt'
   ];
   const CLOUD_EMAIL_KEYS = [
-    'notifyAdminEmail', 'notifyCcEmail', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
+    'notifyAdminEmail', 'notifyCcEmail', 'ticketCategories', 'emailRouting', 'publicAppUrl', 'adminPanelUrl', 'smtpFromEmail', 'smtpReplyTo',
     'mailCollection', 'firestoreLocation', 'smtpAuthType', 'firestoreTtlType', 'ticketEmailMode'
   ];
 
@@ -3045,6 +3047,12 @@ const ARTURITO_GADGET_CATEGORIES = {
         gadgetCategoryOrder: Array.isArray(s.gadgetCategoryOrder) ? s.gadgetCategoryOrder.slice() : [],
         notifyAdminEmail: defs.notifyAdminEmail || 'conserjeria.wm815@gmail.com',
         notifyCcEmail: s.notifyCcEmail || '',
+        ticketCategories: Array.isArray(s.ticketCategories) && s.ticketCategories.length
+          ? s.ticketCategories.map((c) => String(c || '').trim()).filter(Boolean)
+          : DEFAULT_TICKET_CATEGORIES.slice(),
+        emailRouting: s.emailRouting && Array.isArray(s.emailRouting.routes)
+          ? { enabled: s.emailRouting.enabled !== false, routes: s.emailRouting.routes.map((r) => ({ ...r })) }
+          : { enabled: true, routes: [] },
         publicAppUrl: s.publicAppUrl || DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL,
         smtpFromEmail: s.smtpFromEmail || defs.smtpFromEmail || '',
@@ -3854,7 +3862,8 @@ const ARTURITO_GADGET_CATEGORIES = {
 
 const STORAGE_KEY = 'arturito_ai_database';
 const BACKUP_PREFIX = 'arturito_ai_backup_';
-const CATEGORIES = ['Mantención','Postventa','Seguridad','Conserjería','Mudanzas','Gastos Comunes','Reclamos','Emergencias'];
+const DEFAULT_TICKET_CATEGORIES = ['Mantención','Postventa','Seguridad','Conserjería','Mudanzas','Gastos Comunes','Reclamos','Emergencias'];
+const CATEGORIES = DEFAULT_TICKET_CATEGORIES;
 const STATUSES = ['Abierto','En Revisión','Asignado','En Proceso','Resuelto','Cerrado'];
 const PRIORITIES = ['Baja','Media','Alta','Crítica'];
 const ROLES = ['SuperAdmin','Administrador','Supervisor','Operador','Conserje','Residente','Comité'];
@@ -3889,6 +3898,60 @@ function showTopicsOnWelcome() {
 function getChatShortcuts() {
   if (Array.isArray(database.settings?.chatShortcuts) && database.settings.chatShortcuts.length) return database.settings.chatShortcuts;
   return DEFAULT_CHAT_SHORTCUTS;
+}
+function getTicketCategories() {
+  const configured = Array.isArray(database.settings?.ticketCategories)
+    ? database.settings.ticketCategories.map((c) => String(c || '').trim()).filter(Boolean)
+    : [];
+  return configured.length ? [...new Set(configured)] : DEFAULT_TICKET_CATEGORIES.slice();
+}
+function parseEmailList(raw) {
+  return String(raw || '').split(/[,;]/).map((email) => email.trim()).filter(Boolean);
+}
+function isValidEmailAddress(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+}
+function normalizeMailCollectionName(raw) {
+  const name = String(raw || 'mail').trim() || 'mail';
+  if (!/^mail[a-z0-9_-]*$/i.test(name)) {
+    throw new Error('La colección del trigger debe comenzar con "mail" y usar solo letras, números, guion o guion bajo.');
+  }
+  return name;
+}
+function parseEmailRoutingRules(raw, ticketCategories = getTicketCategories()) {
+  const allowed = new Set(ticketCategories.map((c) => c.toLowerCase()));
+  return String(raw || '').split(/\n+/).map((line) => line.trim()).filter(Boolean).map((line, index) => {
+    const parts = line.split('|').map((p) => p.trim());
+    if (parts.length < 2) throw new Error(`Ruta ${index + 1}: usa "Categoría | destino | cc | colección".`);
+    const categories = parts[0] === '*'
+      ? ['*']
+      : parts[0].split(',').map((c) => c.trim()).filter(Boolean);
+    if (!categories.length) throw new Error(`Ruta ${index + 1}: falta categoría.`);
+    const unknown = categories.filter((cat) => cat !== '*' && !allowed.has(cat.toLowerCase()));
+    if (unknown.length) throw new Error(`Ruta ${index + 1}: categoría no existe: ${unknown.join(', ')}.`);
+    const to = parseEmailList(parts[1]);
+    const invalidTo = to.filter((email) => !isValidEmailAddress(email));
+    if (!to.length || invalidTo.length) throw new Error(`Ruta ${index + 1}: correo destino inválido.`);
+    const cc = parseEmailList(parts[2] || '');
+    const invalidCc = cc.filter((email) => !isValidEmailAddress(email));
+    if (invalidCc.length) throw new Error(`Ruta ${index + 1}: correo CC inválido.`);
+    const collection = normalizeMailCollectionName(parts[3] || 'mail');
+    return {
+      id: `route_${index + 1}`,
+      categories,
+      to: [...new Set(to)],
+      cc: [...new Set(cc)],
+      collection
+    };
+  });
+}
+function formatEmailRoutingRules(routes = []) {
+  return (routes || []).map((route) => [
+    (route.categories || []).join(', ') || '*',
+    (route.to || []).join(', '),
+    (route.cc || []).join(', '),
+    route.collection || 'mail'
+  ].join(' | ')).join('\n');
 }
 /** Iconos SVG representativos (estilo lineal) */
 const IconSVG = {
@@ -4071,6 +4134,8 @@ const DatabaseModule = {
         theme: 'light',
         notifyAdminEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
         notifyCcEmail: ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
+        ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
+        emailRouting: { enabled: true, routes: [] },
         publicAppUrl: DEFAULT_PUBLIC_APP_URL,
         adminPanelUrl: DEFAULT_PUBLIC_APP_URL,
         smtpConnectionUri: '',
@@ -4095,6 +4160,8 @@ const DatabaseModule = {
       adminKey:'admin123', theme:'light',
       notifyAdminEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyAdminEmail,
       notifyCcEmail:ARTURITO_FIREBASE_EMAIL_DEFAULTS.notifyCcEmail || '',
+      ticketCategories: DEFAULT_TICKET_CATEGORIES.slice(),
+      emailRouting: { enabled: true, routes: [] },
       publicAppUrl: DEFAULT_PUBLIC_APP_URL,
       adminPanelUrl:DEFAULT_PUBLIC_APP_URL,
       smtpConnectionUri:'',
@@ -5727,6 +5794,8 @@ const SettingsModule = {
     const defs = window.ARTURITO_FIREBASE_EMAIL_DEFAULTS || {};
     set('setNotifyAdminEmail', defs.notifyAdminEmail || 'conserjeria.wm815@gmail.com', 'value');
     set('setNotifyCcEmail', s.notifyCcEmail || '', 'value');
+    set('setTicketCategories', getTicketCategories().join('\n'), 'value');
+    set('setEmailRoutingRules', formatEmailRoutingRules(s.emailRouting?.routes || []), 'value');
     set('setPublicAppUrl', resolvePublicAppUrl(), 'value');
     set('setAdminPanelUrl', s.adminPanelUrl || DEFAULT_PUBLIC_APP_URL, 'value');
     set('setSmtpReplyTo', s.smtpReplyTo || defs.smtpReplyTo || '', 'value');
@@ -5790,6 +5859,24 @@ const SettingsModule = {
       return;
     }
     database.settings.notifyCcEmail = notifyCcEmail;
+    const ticketCategories = (document.getElementById('setTicketCategories')?.value || '')
+      .split(/\n+/)
+      .map((cat) => cat.trim())
+      .filter(Boolean);
+    if (!ticketCategories.length) {
+      toast('Debes mantener al menos una categoría de ticket', 'warning');
+      return;
+    }
+    database.settings.ticketCategories = [...new Set(ticketCategories)];
+    try {
+      database.settings.emailRouting = {
+        enabled: true,
+        routes: parseEmailRoutingRules(document.getElementById('setEmailRoutingRules')?.value || '', database.settings.ticketCategories)
+      };
+    } catch (err) {
+      toast(err.message || 'Revisa la canalización por categoría', 'warning');
+      return;
+    }
     database.settings.adminPanelUrl = document.getElementById('setAdminPanelUrl').value.trim() || DEFAULT_PUBLIC_APP_URL;
     database.settings.publicAppUrl = resolvePublicAppUrl();
     const replyTo = document.getElementById('setSmtpReplyTo')?.value.trim() || '';
@@ -5808,6 +5895,9 @@ const SettingsModule = {
     TicketEmailDebug.updateSmtpStatusIndicator();
     await TicketEmailDebug.audit('Tras guardar configuración');
     this.apply();
+    TicketModule.init();
+    TicketModule.render();
+    ReportModule.render();
     this.replayPortalEntrance();
     if (document.getElementById('ccWelcome')) document.getElementById('ccWelcome').value = database.settings.welcomeMessage;
     if (result?.cloud) {
@@ -8253,6 +8343,56 @@ const TicketEmailDebug = {
     ].join('\n');
     return { subject, html, text, buildingName, adminPanelUrl, condominioId };
   },
+  getCategoryEmailRoutes(settings, category) {
+    const routes = settings?.emailRouting?.enabled === false ? [] : (settings?.emailRouting?.routes || []);
+    const current = String(category || '').trim().toLowerCase();
+    return routes.filter((route) => {
+      const cats = route.categories || [];
+      return cats.includes('*') || cats.some((cat) => String(cat || '').trim().toLowerCase() === current);
+    });
+  },
+  async queueCategoryRouteMails(ticketId, ticket, settings, email, replyTo) {
+    const routes = this.getCategoryEmailRoutes(settings, ticket.categoria || ticket.asunto);
+    if (!routes.length) return [];
+    const { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } = ArturitoCloud.fb._modules;
+    const queued = [];
+    for (const [index, route] of routes.entries()) {
+      const collection = normalizeMailCollectionName(route.collection || 'mail');
+      const routeKey = String(route.id || `route_${index + 1}`).replace(/[^a-z0-9_-]+/gi, '_').toLowerCase();
+      const mailId = collection === 'mail' ? `${ticketId}-${routeKey}` : ticketId;
+      const mailRef = doc(ArturitoCloud.fb.db, collection, mailId);
+      const existing = getDocFromServer ? await getDocFromServer(mailRef) : await getDoc(mailRef);
+      if (existing.exists()) {
+        this.log('Ruta de correo ya encolada', { collection, mailId, route: routeKey });
+        continue;
+      }
+      const to = Array.isArray(route.to) ? route.to : this._parseEmails(route.to);
+      const cc = Array.isArray(route.cc) ? route.cc : this._parseEmails(route.cc);
+      await setDoc(mailRef, {
+        to: to.length === 1 ? to[0] : to,
+        ...(cc.length ? { cc: cc.length === 1 ? cc[0] : cc } : {}),
+        replyTo,
+        message: { subject: email.subject, html: email.html, text: email.text },
+        createdAt: serverTimestamp(),
+        status: 'pending',
+        meta: {
+          tipo: 'ticket_created',
+          ticketId,
+          condominioId: email.condominioId,
+          source: 'app-category-route',
+          category: ticket.categoria || ticket.asunto || '',
+          routeId: route.id || routeKey,
+          routeCollection: collection,
+          database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros',
+          createdAt: serverTimestamp()
+        }
+      });
+      queued.push({ collection, mailId, to, cc });
+      if (collection === 'mail') void this.watchMailDelivery(mailId, 10, false);
+    }
+    if (queued.length) this.log('✓ Canalización por categoría encolada', queued);
+    return queued;
+  },
   async queueMailForTicket(ticketId, ticket) {
     if (typeof ArturitoCloud === 'undefined' || !ArturitoCloud.fb?.isEnabled()) {
       throw new Error('Firebase no conectado');
@@ -8282,6 +8422,7 @@ const TicketEmailDebug = {
         database: ArturitoCloud.fb.getFirestoreDatabaseId?.() || 'chatbotentrecerros'
       });
       void this.watchMailDelivery(ticketId);
+      void this.queueCategoryRouteMails(ticketId, ticket, settings, this.buildTicketEmailPayload(ticketId, ticket, settings), ticket.email || settings?.smtpReplyTo || to[0]);
       void this.queueClientConfirmationMail(ticketId, ticket, settings);
       return ticketId;
     }
@@ -8308,6 +8449,7 @@ const TicketEmailDebug = {
       to: to.join(', '),
       cc: cc.join(', ') || '(sin copia)'
     });
+    await this.queueCategoryRouteMails(ticketId, ticket, settings, email, replyTo);
     void this.watchMailDelivery(ticketId);
     void this.queueClientConfirmationMail(ticketId, ticket, settings);
     return ticketId;
@@ -9233,11 +9375,11 @@ const TicketModule = {
       const el = document.getElementById(sel);
       el.innerHTML = `<option value="">${allLabel}</option>` + arr.map(v => `<option value="${v}">${v}</option>`).join('');
     };
-    fill('ticketFilterCat', CATEGORIES, 'Todas categorías');
+    fill('ticketFilterCat', getTicketCategories(), 'Todas categorías');
     fill('ticketFilterStatus', STATUSES, 'Todos estados');
     fill('ticketFilterPriority', PRIORITIES, 'Todas prioridades');
     fill('adminFilterStatus', STATUSES, 'Todos estados');
-    document.getElementById('tCategoria').innerHTML = CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+    document.getElementById('tCategoria').innerHTML = getTicketCategories().map(c => `<option value="${c}">${c}</option>`).join('');
     document.getElementById('tPrioridad').innerHTML = PRIORITIES.map(p => `<option value="${p}">${p}</option>`).join('');
     document.getElementById('tEstado').innerHTML = STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
   },
@@ -9567,9 +9709,9 @@ const TrainingModule = {
   init() {
     this.initTabs();
     this.initDropZone();
-    document.getElementById('tCategory').innerHTML = ['General', ...CATEGORIES].map(c => `<option value="${c}">${c}</option>`).join('');
+    document.getElementById('tCategory').innerHTML = ['General', ...getTicketCategories()].map(c => `<option value="${c}">${c}</option>`).join('');
     document.getElementById('btnNewKnowledge').addEventListener('click', () => this.openCreate());
-    document.getElementById('kCategoria').innerHTML = ['General', ...CATEGORIES].map(c => `<option value="${c}">${c}</option>`).join('');
+    document.getElementById('kCategoria').innerHTML = ['General', ...getTicketCategories()].map(c => `<option value="${c}">${c}</option>`).join('');
     document.getElementById('knowledgeForm').addEventListener('submit', e => this.saveManual(e));
     document.getElementById('knowledgeSearch').addEventListener('input', () => this.renderManual());
     document.getElementById('btnExportKnowledge').addEventListener('click', () => this.exportManual());
@@ -10201,7 +10343,7 @@ const TrainingModule = {
   },
   /** Genera tarjeta editable de análisis de un tema */
   buildAnalysisCard(t) {
-    const cats = ['General', ...CATEGORIES].map(c =>
+    const cats = ['General', ...getTicketCategories()].map(c =>
       `<option value="${c}"${t.category===c?' selected':''}>${c}</option>`).join('');
     return `<div class="topic-analysis-card" data-topic-id="${t.id}">
       <div class="topic-analysis-card-header">
@@ -10691,7 +10833,7 @@ const ReportModule = {
       this.renderChartJS();
       return;
     }
-    this.drawPie('chartCategory', this.countBy('categoria', CATEGORIES));
+    this.drawPie('chartCategory', this.countBy('categoria', getTicketCategories()));
     this.drawPie('chartStatus', this.countBy('estado', STATUSES));
     this.drawPie('chartPriority', this.countBy('prioridad', PRIORITIES));
     this.drawLine('chartMonthly', this.monthlyData());
@@ -10703,7 +10845,7 @@ const ReportModule = {
   renderChartJS() {
     this.destroyCharts();
     const opts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } };
-    const cat = this.countBy('categoria', CATEGORIES);
+    const cat = this.countBy('categoria', getTicketCategories());
     this._charts.category = new Chart(document.getElementById('chartCategory'), {
       type: 'doughnut',
       data: { labels: cat.labels, datasets: [{ data: cat.values, backgroundColor: this.colors }] },
