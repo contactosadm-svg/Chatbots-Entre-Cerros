@@ -5895,7 +5895,7 @@ const SettingsModule = {
     TicketEmailDebug.updateSmtpStatusIndicator();
     await TicketEmailDebug.audit('Tras guardar configuración');
     this.apply();
-    TicketModule.init();
+    TicketModule.populateSelects();
     TicketModule.render();
     ReportModule.render();
     this.replayPortalEntrance();
@@ -8359,7 +8359,7 @@ const TicketEmailDebug = {
     for (const [index, route] of routes.entries()) {
       const collection = normalizeMailCollectionName(route.collection || 'mail');
       const routeKey = String(route.id || `route_${index + 1}`).replace(/[^a-z0-9_-]+/gi, '_').toLowerCase();
-      const mailId = collection === 'mail' ? `${ticketId}-${routeKey}` : ticketId;
+      const mailId = `${ticketId}-${routeKey}`;
       const mailRef = doc(ArturitoCloud.fb.db, collection, mailId);
       const existing = getDocFromServer ? await getDocFromServer(mailRef) : await getDoc(mailRef);
       if (existing.exists()) {
