@@ -487,8 +487,12 @@ body.mode-client #adminApp{display:none!important}
 .chat-msg-body a.topic-link{cursor:pointer;display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .35rem;border-radius:5px;text-decoration:none;color:#374151;font-size:.78rem;font-weight:500;border-bottom:none;transition:all .2s ease;margin:.1rem 0}
 .chat-msg-body a.topic-link:hover{background:rgba(127,186,2,.12);color:var(--arturito-green-dark);transform:translateX(3px)}
 .chat-msg-body .topic-icon{font-size:.85rem;line-height:1}
+.chat-msg-body .topic-item{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin:.1rem 0}
+.chat-msg-body .topic-ticket-link{display:inline-flex;align-items:center;gap:.25rem;border:1px solid rgba(127,186,2,.28);background:rgba(127,186,2,.08);color:var(--arturito-green-dark);border-radius:999px;padding:.18rem .45rem;font-size:.7rem;font-weight:700;cursor:pointer;transition:all .2s ease}
+.chat-msg-body .topic-ticket-link:hover{background:rgba(127,186,2,.16);border-color:rgba(127,186,2,.45);transform:translateY(-1px)}
 .chat-msg-body .topic-suggestions-wrap{margin-top:.65rem;display:flex;flex-direction:column;gap:.35rem}
-.chat-msg-body .topic-suggestion-item a.topic-link{width:100%;padding:.45rem .55rem;background:rgba(127,186,2,.06);border:1px solid rgba(127,186,2,.18);border-radius:8px;font-size:.8rem}
+.chat-msg-body .topic-suggestion-item{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}
+.chat-msg-body .topic-suggestion-item a.topic-link{flex:1 1 180px;padding:.45rem .55rem;background:rgba(127,186,2,.06);border:1px solid rgba(127,186,2,.18);border-radius:8px;font-size:.8rem}
 .chat-msg-body .topic-suggestion-item a.topic-link:hover{background:rgba(127,186,2,.14);border-color:rgba(127,186,2,.35)}
 
 .chat-dock .typing-indicator{display:none;align-self:flex-start;margin:0 .75rem .45rem;padding:.5rem .75rem;background:#f9fafb;border-radius:16px 16px 16px 4px;border:1px solid rgba(148,163,184,.25);box-shadow:0 4px 16px rgba(0,0,0,.06);gap:5px;align-items:center;flex-shrink:0}
@@ -1630,6 +1634,7 @@ tr.ticket-has-reply{background:linear-gradient(90deg,rgba(251,191,36,.16),transp
     <div class="form-group full"><label>Palabras clave * <span style="font-weight:400;color:var(--text-muted)">(separadas por coma)</span></label><input type="text" id="gkbKeywords" required placeholder="mudanza, mudanzas, horario"></div>
     <div class="form-group full"><label>Respuesta completa *</label><textarea id="gkbResponse" rows="12" required placeholder="Texto que Arturito responderá..."></textarea></div>
     <div class="form-group full"><label style="display:flex;align-items:center;gap:.5rem;font-weight:400"><input type="checkbox" id="gkbEnabled" checked> Tema activo en el chat</label></div>
+    <div class="form-group full"><label style="display:flex;align-items:center;gap:.5rem;font-weight:400"><input type="checkbox" id="gkbRequiresTicket"> Mostrar botón "Crear solicitud" para este tema</label><p class="ticket-hint" style="margin:.3rem 0 0">Actívalo cuando el tema deba quedar registrado como solicitud para seguimiento de administración.</p></div>
     <div class="form-group full" style="display:flex;gap:.5rem;justify-content:flex-end">
       <button type="button" class="btn btn-secondary" data-close="modalGadgetKB">Cancelar</button>
       <button type="submit" class="btn btn-primary"><span data-icon="save" data-icon-size="sm"></span> Guardar tema</button>
@@ -2912,6 +2917,7 @@ const ARTURITO_GADGET_CATEGORIES = {
             icon: e.icon || '',
             key: e.key,
             order: e.order ?? 0,
+            requiresTicket: e.requiresTicket === true,
             createdAt: e.createdAt || Date.now(),
             updatedAt: e.updatedAt || Date.now()
           };
@@ -5925,6 +5931,7 @@ const GadgetKBModule = {
       keywords: Array.isArray(data.keywords) ? data.keywords : String(data.keywords).split(',').map(k => k.trim()).filter(Boolean),
       response: data.response.trim(),
       enabled: data.enabled !== false,
+      requiresTicket: data.requiresTicket === true,
       updatedAt: Date.now()
     };
     if (editId) {
@@ -5972,7 +5979,11 @@ const GadgetKBModule = {
       html += `<div class="category-topics">`;
       categoryTopics.forEach(topic => {
         html += `<div class="topic-item"><a href="#" class="topic-link" data-entry-id="${escapeHtml(topic.id)}" data-question="${escapeHtml(topic.question || '')}">`;
-        html += `<span class="topic-icon">${escapeHtml(topic.icon || '')}</span><span class="topic-title">${escapeHtml(topic.title)}</span></a></div>`;
+        html += `<span class="topic-icon">${escapeHtml(topic.icon || '')}</span><span class="topic-title">${escapeHtml(topic.title)}</span></a>`;
+        if (topic.requiresTicket === true) {
+          html += `<button type="button" class="topic-ticket-link" data-topic-ticket="${escapeHtml(topic.id)}">${icon('ticket', 'sm')} Crear solicitud</button>`;
+        }
+        html += `</div>`;
       });
       html += `</div></div>`;
     });
@@ -5990,7 +6001,11 @@ const GadgetKBModule = {
       html += '<div class="topic-suggestion-item">';
       html += `<a href="#" class="topic-link" data-entry-id="${escapeHtml(id)}" data-question="${escapeHtml(q)}">`;
       html += `<span class="topic-icon">${escapeHtml(item.icon || '💡')}</span>`;
-      html += `<span class="topic-title">${escapeHtml(item.title || q)}</span></a></div>`;
+      html += `<span class="topic-title">${escapeHtml(item.title || q)}</span></a>`;
+      if (item.requiresTicket === true) {
+        html += `<button type="button" class="topic-ticket-link" data-topic-ticket="${escapeHtml(id)}">${icon('ticket', 'sm')} Crear solicitud</button>`;
+      }
+      html += `</div>`;
     });
     html += '</div>';
     return html;
@@ -6015,6 +6030,7 @@ const GadgetKBModule = {
       keywords: Array.isArray(e.keywords) ? e.keywords : [],
       response: e.response || '',
       enabled: e.enabled !== false,
+      requiresTicket: e.requiresTicket === true,
       order: e.order ?? i,
       createdAt: e.createdAt || Date.now()
     }));
@@ -6053,6 +6069,7 @@ const KnowledgeBaseModule = {
       icon: entry.icon || '',
       key: entry.key,
       order: entry.order ?? 0,
+      requiresTicket: entry.requiresTicket === true,
       createdAt: entry.createdAt || Date.now(),
       updatedAt: entry.updatedAt || Date.now()
     };
@@ -7331,6 +7348,7 @@ const ResponseEngine = {
         title: entry.pregunta,
         question: gEntry?.question || entry.pregunta,
         icon: entry.icon || gEntry?.icon || '💡',
+        requiresTicket: entry.requiresTicket === true || gEntry?.requiresTicket === true,
         score,
         signals
       });
@@ -8227,6 +8245,13 @@ const ChatModule = {
         this.onTopicSelected(link.dataset.entryId, link.dataset.question);
       };
     });
+    box.querySelectorAll('.topic-ticket-link').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        TicketModule.openCreateFromChat();
+      };
+    });
   },
   /** Ejecuta acciones del chat sin compilar JavaScript inline */
   bindMessageActionEvents() {
@@ -8274,12 +8299,12 @@ const ChatModule = {
   /** Responde al seleccionar un tema del menú o sugerencia relacionada */
   onTopicSelected(entryId, question) {
     const conv = this.getCurrent();
-    const deliver = (replyText, meta) => {
+    const deliver = (replyText, meta, actions) => {
       const finalized = ResponseEngine.finalizeResponse(
         { text: replyText, confidence: meta.confidence, skipCompanion: false },
         { userText: meta.userQuery, query: meta.userQuery, match: { title: meta.topicTitle }, intent: 'topic_select', conv }
       );
-      this.addBotMessage(finalized.text, undefined, {
+      this.addBotMessage(finalized.text, actions, {
         userQuery: meta.userQuery,
         source: meta.source,
         topicTitle: meta.topicTitle,
@@ -8295,12 +8320,15 @@ const ChatModule = {
       this.showTyping(true);
       setTimeout(() => {
         this.showTyping(false);
+        const actions = entry.requiresTicket === true
+          ? [{ label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' }]
+          : undefined;
         deliver(GadgetKBModule.formatResponse(entry.response, question || entry.title), {
           userQuery: question || entry.title || entry.question,
           source: 'gadget',
           topicTitle: entry.title,
           confidence: 92
-        });
+        }, actions);
       }, 650 + Math.random() * 500);
       return;
     }
@@ -8313,12 +8341,15 @@ const ChatModule = {
       this.showTyping(true);
       setTimeout(() => {
         this.showTyping(false);
+        const actions = kEntry.requiresTicket === true
+          ? [{ label: 'Crear solicitud', icon: 'ticket', fn: 'TicketModule.openCreateFromChat()' }]
+          : undefined;
         deliver(GadgetKBModule.formatResponse(kEntry.respuesta, q), {
           userQuery: q,
           source: kEntry.origin === 'gadget' ? 'gadget' : 'manual',
           topicTitle: kEntry.pregunta,
           confidence: 90
-        });
+        }, actions);
       }, 650 + Math.random() * 500);
       return;
     }
@@ -11267,7 +11298,7 @@ const TrainingModule = {
               ${actionBtn('trash', `TrainingModule.removeGadgetKB('${e.id}')`, 'Eliminar', true)}
             </div>
           </div>
-          <div class="kb-gadget-entry-meta">${e.enabled === false ? 'Desactivado · ' : ''}#${(e.order ?? 0) + 1} · ${(e.keywords || []).length} palabras clave</div>
+          <div class="kb-gadget-entry-meta">${e.enabled === false ? 'Desactivado · ' : ''}${e.requiresTicket === true ? 'Con solicitud · ' : ''}#${(e.order ?? 0) + 1} · ${(e.keywords || []).length} palabras clave</div>
           <div class="kb-gadget-entry-preview">${escapeHtml(String(e.response || '').substring(0, 220))}</div>
           <div class="kb-gadget-keywords">${(e.keywords || []).slice(0, 8).map(k => `<span class="kb-gadget-kw">${escapeHtml(k)}</span>`).join('')}${(e.keywords||[]).length > 8 ? '<span class="kb-gadget-kw">+' + ((e.keywords||[]).length - 8) + '</span>' : ''}</div>
           </div>
@@ -11370,6 +11401,7 @@ const TrainingModule = {
     document.getElementById('gkbEditId').value = '';
     document.getElementById('gadgetKBForm').reset();
     document.getElementById('gkbEnabled').checked = true;
+    document.getElementById('gkbRequiresTicket').checked = false;
     document.getElementById('gkbIcon').value = '';
     document.getElementById('gkbCategory').value = 'normativas';
     openModal('modalGadgetKB');
@@ -11385,6 +11417,7 @@ const TrainingModule = {
     document.getElementById('gkbKeywords').value = Array.isArray(e.keywords) ? e.keywords.join(', ') : '';
     document.getElementById('gkbResponse').value = e.response || '';
     document.getElementById('gkbEnabled').checked = e.enabled !== false;
+    document.getElementById('gkbRequiresTicket').checked = e.requiresTicket === true;
     openModal('modalGadgetKB');
   },
   async saveGadgetKB(ev) {
@@ -11400,7 +11433,8 @@ const TrainingModule = {
       question: document.getElementById('gkbQuestion').value,
       keywords: document.getElementById('gkbKeywords').value.split(',').map(k => k.trim()).filter(Boolean),
       response: document.getElementById('gkbResponse').value,
-      enabled: document.getElementById('gkbEnabled').checked
+      enabled: document.getElementById('gkbEnabled').checked,
+      requiresTicket: document.getElementById('gkbRequiresTicket').checked
     });
     closeModal('modalGadgetKB');
     this.renderGadgetKB();
